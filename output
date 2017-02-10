@@ -1,0 +1,81 @@
+Compiling...
+TraderSpi.cpp: In member function ‘virtual void CTraderSpi::OnRtnInvestorAccountDeposit(CUstpFtdcInvestorAccountDepositResField*)’:
+TraderSpi.cpp:602:58: warning: format ‘%s’ expects argument of type ‘char*’, but argument 2 has type ‘TUstpFtdcMoneyType {aka double}’ [-Wformat=]
+  printf("��[%s]\n",pInvestorAccountDepositRes->Amount);
+                                                          ^
+TraderSpi.cpp:603:73: warning: format ‘%s’ expects argument of type ‘char*’, but argument 2 has type ‘int’ [-Wformat=]
+  printf("�������[%s]\n",pInvestorAccountDepositRes->AmountDirection);
+                                                                         ^
+TraderSpi.cpp:604:65: warning: format ‘%s’ expects argument of type ‘char*’, but argument 2 has type ‘TUstpFtdcMoneyType {aka double}’ [-Wformat=]
+  printf("�����ʽ�[%s]\n",pInvestorAccountDepositRes->Available);
+                                                                 ^
+TraderSpi.cpp:605:65: warning: format ‘%s’ expects argument of type ‘char*’, but argument 2 has type ‘TUstpFtdcMoneyType {aka double}’ [-Wformat=]
+  printf("����׼����[%s]\n",pInvestorAccountDepositRes->Balance);
+                                                                 ^
+PublicFuncs.cpp:30:19: warning: deprecated conversion from string constant to ‘char*’ [-Wwrite-strings]
+ char* g_pFlowPath="./flow/";
+                   ^
+PublicFuncs.cpp:31:22: warning: deprecated conversion from string constant to ‘char*’ [-Wwrite-strings]
+ char* g_pProductInfo="��ʾ���Թ���V1.0";
+                      ^
+PublicFuncs.cpp:32:22: warning: deprecated conversion from string constant to ‘char*’ [-Wwrite-strings]
+ char* g_pProgramName="TestApi";
+                      ^
+PublicFuncs.cpp: In function ‘bool StartAutoOrder()’:
+PublicFuncs.cpp:481:16: warning: unused variable ‘dwIDThread’ [-Wunused-variable]
+  unsigned long dwIDThread;
+                ^
+PublicFuncs.cpp: In function ‘void ShowManu()’:
+PublicFuncs.cpp:76:23: warning: ignoring return value of ‘int scanf(const char*, ...)’, declared with attribute warn_unused_result [-Wunused-result]
+  scanf("%d",&g_choose);
+                       ^
+PublicFuncs.cpp: In function ‘void StartInputOrder()’:
+PublicFuncs.cpp:94:30: warning: ignoring return value of ‘int scanf(const char*, ...)’, declared with attribute warn_unused_result [-Wunused-result]
+  scanf("%s",(ord.InvestorID));
+                              ^
+PublicFuncs.cpp:98:32: warning: ignoring return value of ‘int scanf(const char*, ...)’, declared with attribute warn_unused_result [-Wunused-result]
+  scanf("%s",(ord.InstrumentID));
+                                ^
+PublicFuncs.cpp:102:35: warning: ignoring return value of ‘int scanf(const char*, ...)’, declared with attribute warn_unused_result [-Wunused-result]
+  scanf("%c",&(ord.OrderPriceType));
+                                   ^
+PublicFuncs.cpp:106:30: warning: ignoring return value of ‘int scanf(const char*, ...)’, declared with attribute warn_unused_result [-Wunused-result]
+  scanf("%c",&(ord.Direction));
+                              ^
+PublicFuncs.cpp:110:31: warning: ignoring return value of ‘int scanf(const char*, ...)’, declared with attribute warn_unused_result [-Wunused-result]
+  scanf("%c",&(ord.OffsetFlag));
+                               ^
+PublicFuncs.cpp:114:30: warning: ignoring return value of ‘int scanf(const char*, ...)’, declared with attribute warn_unused_result [-Wunused-result]
+  scanf("%c",&(ord.HedgeFlag));
+                              ^
+PublicFuncs.cpp:118:32: warning: ignoring return value of ‘int scanf(const char*, ...)’, declared with attribute warn_unused_result [-Wunused-result]
+  scanf("%lf",&(ord.LimitPrice));
+                                ^
+PublicFuncs.cpp:122:27: warning: ignoring return value of ‘int scanf(const char*, ...)’, declared with attribute warn_unused_result [-Wunused-result]
+  scanf("%d",&(ord.Volume));
+                           ^
+PublicFuncs.cpp:126:34: warning: ignoring return value of ‘int scanf(const char*, ...)’, declared with attribute warn_unused_result [-Wunused-result]
+  scanf("%c",&(ord.TimeCondition));
+                                  ^
+PublicFuncs.cpp: In function ‘void StartOrderAction()’:
+PublicFuncs.cpp:162:38: warning: ignoring return value of ‘int scanf(const char*, ...)’, declared with attribute warn_unused_result [-Wunused-result]
+  scanf("%s",(OrderAction.InvestorID));
+                                      ^
+PublicFuncs.cpp:166:20: warning: ignoring return value of ‘int scanf(const char*, ...)’, declared with attribute warn_unused_result [-Wunused-result]
+  scanf("%d",&SysID);
+                    ^
+PublicFuncs.cpp: In function ‘void StartQryInvestorPosition()’:
+PublicFuncs.cpp:342:46: warning: ignoring return value of ‘int scanf(const char*, ...)’, declared with attribute warn_unused_result [-Wunused-result]
+  scanf("%s",(QryInvestorPosition.InvestorID));
+                                              ^
+PublicFuncs.cpp: In function ‘void StartUpdatePassword()’:
+PublicFuncs.cpp:360:39: warning: ignoring return value of ‘int scanf(const char*, ...)’, declared with attribute warn_unused_result [-Wunused-result]
+  scanf("%s",(PasswordUpd.OldPassword));
+                                       ^
+PublicFuncs.cpp:362:39: warning: ignoring return value of ‘int scanf(const char*, ...)’, declared with attribute warn_unused_result [-Wunused-result]
+  scanf("%s",(PasswordUpd.NewPassword));
+                                       ^
+PublicFuncs.cpp: In function ‘void StartQueryComplianceParam()’:
+PublicFuncs.cpp:405:42: warning: ignoring return value of ‘int scanf(const char*, ...)’, declared with attribute warn_unused_result [-Wunused-result]
+  scanf("%s",(ComplianceParam.InvestorID));
+                                          ^
