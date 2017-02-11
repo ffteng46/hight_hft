@@ -25,7 +25,7 @@ void logEngine(){
     cout<<boosttoolsnamespace::CBoostTools::gbktoutf8("启动进程")<<endl;
 	ofstream in;
 	in.open(filepath,ios::app); //ios::trunc表示在打开文件前将文件清空,由于是写入,文件不存在则创建
-    LogMsg *pData;/*
+    LogMsg *pData;
     while(1)
     {
 
@@ -46,7 +46,7 @@ void logEngine(){
             in<<cw<<endl;
         }
          //cout<<"yigong="<<c<<endl;
-    }*/
+    }
 	in.close();//关闭文件
 }
 

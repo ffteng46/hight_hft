@@ -8,14 +8,14 @@
 #if _MSC_VER > 1000
 #pragma once
 #endif // _MSC_VER > 1000
-
+#include <string>
 #include "PublicFuncs.h"
 class CTraderSpi : public CUstpFtdcTraderSpi  
 {
 public:
 	CTraderSpi(CUstpFtdcTraderApi *pTrader);
 	virtual ~CTraderSpi();
-
+    int md_orderinsert(double price,char *dir,char *offset,char * ins,int ordervolume);
 	virtual void OnFrontConnected();
     virtual void OnFrontDisconnected (int nReason);
 	virtual void OnRspUserLogin(CUstpFtdcRspUserLoginField *pRspUserLogin, CUstpFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast);
@@ -53,6 +53,7 @@ public:
 	void Show(CUstpFtdcOrderField *pOrder);
 	void Show(CUstpFtdcTradeField *pTrade);
 	void Show(CUstpFtdcRspInstrumentField *pRspInstrument);
+    string getInvestorOrderInsertInfo(CUstpFtdcInputOrderField *order);
 private:	
 	CUstpFtdcTraderApi *m_pUserApi;
 };

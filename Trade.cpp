@@ -212,8 +212,9 @@ void TradeProcess::initThread(int sendtype)
 //    thread_log_group.create_thread(test);
     //thread_log_group.create_thread(marketdataEngine);
     //thread_log_group.join_all();
-    /**
     HANDLE loghdl = CreateThread(NULL,0,logEngine,NULL,0,NULL);
+    /**
+
     CloseHandle(loghdl);
     if (sendtype == 0){
         HANDLE hd1 = CreateThread(NULL,0,sendByClient,NULL,0,NULL);

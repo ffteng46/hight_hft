@@ -5,13 +5,18 @@
 #include "TraderSpi.h"
 #include <unistd.h>
 #include <iostream>
+#include "globalutil.h"
 //////////////////////////////////////////////////////////////////////
 // Construction/Destruction
 //////////////////////////////////////////////////////////////////////
 using namespace std;
 
+// UserApi对象
+extern CUstpFtdcTraderApi* pUserApi;
 extern FILE * g_fpRecv;
-
+extern int orderref;
+// 请求编号
+extern int iRequestID;
 CTraderSpi::CTraderSpi(CUstpFtdcTraderApi *pTrader):m_pUserApi(pTrader)
 {
 
@@ -22,7 +27,109 @@ CTraderSpi::~CTraderSpi()
 
 }
 
+//记录时间
+int CTraderSpi::md_orderinsert(double price,char *dir,char *offset,char * ins,int ordervolume){
+    TUstpFtdcUserOrderLocalIDType ORDER_REF;
+    char InstrumentID[31];
+    strcpy(InstrumentID,ins);
+    char Direction[2];
+    strcpy(Direction,dir);
+    ///投机 '1';套保'3'
+    char HedgeFlag[]="1";
+    //组合开平标志: 开仓 '0';平仓 '1';平今 '3';平昨 '4';强平 '2'
+    char OffsetFlag[2];
+    strcpy(OffsetFlag,offset);
+    ///价格 double
+    TUstpFtdcPriceType Price = price;
+    //开仓手数
+    int Volume = ordervolume;
+    //报单引用编号
+    sprintf(ORDER_REF,"%d",orderref);
+    cout<<"------->"<<ORDER_REF<<endl;
+    orderref++;
+    //报单结构体
+    CUstpFtdcInputOrderField req;
+    ///经纪公司代码
+    strcpy(req.BrokerID, BROKER_ID);
+    ///投资者代码
+    strcpy(req.InvestorID, INVESTOR_ID);
+    ///合约代码// UserApi对象
+    CUstpFtdcTraderApi* pUserApi;
+    strcpy(req.InstrumentID, InstrumentID);
+    ///报单引用
+    strcpy(req.UserOrderLocalID, ORDER_REF);
 
+    ///用户代码
+    //	TUstpFtdcUserIDType	UserID;
+    strcpy(req.UserID,INVESTOR_ID);
+    ///报单价格条件: 限价
+    req.OrderPriceType = USTP_FTDC_OPT_LimitPrice;
+    ///买卖方向:
+    strcpy(&req.Direction,dir);
+    ///组合开平标志: 开仓
+    strcpy(&req.OffsetFlag ,offset);
+    ///组合投机套保标志
+    strcpy(&req.HedgeFlag,HedgeFlag);
+    ///价格
+    req.LimitPrice = Price;
+    ///数量: 1
+    req.Volume = Volume;
+    ///有效期类型: 当日有效
+    //req.TimeCondition = THOST_FTDC_TC_GFD;
+    req.TimeCondition = USTP_FTDC_TC_IOC;
+    ///GTD日期
+    //TUstpFtdcDateType	GTDDate;
+    strcpy(req.GTDDate,"");
+    ///成交量类型: 任何数量
+    req.VolumeCondition = USTP_FTDC_VC_AV;
+    ///最// 请求编号
+    //int iRequestID = 0;
+    //小成交量: 1
+    req.MinVolume = 1;
+    ///触发条件: 立即
+    //req.ContingentCondition = THOST_FTDC_CC_Immediately;
+    ///止损价
+    //TUstpFtdcPriceType	StopPrice;
+    req.StopPrice = 0;
+    ///强平原因: 非强平
+    req.ForceCloseReason = USTP_FTDC_FCR_NotForceClose;
+    ///自动挂起标志: 否
+    req.IsAutoSuspend = 0;
+    ///业务单元
+    //	TUstpFtdcBusinessUnitType	BusinessUnit;
+    strcpy(req.BusinessUnit,"");
+    ///请求编号
+    //	TUstpFtdcRequestIDType	RequestID;
+    ///用户强评标志: 否
+    //req.UserForceClose = 0;///经纪公司代码
+    //
+
+    int nRequestID = ++iRequestID;
+    char char_order_index[10]={'\0'};
+    sprintf(char_order_index,"%d",nRequestID);
+    //req.RequestID = nRequestID;
+
+    nRequestID = ++iRequestID;
+    char char_query_index[10]={'\0'};
+    sprintf(char_query_index,"%d",nRequestID);
+
+    //下单开始时间
+//    int64_t ist_time = GetSysTimeMicros();
+    //orderinsertkey
+//    string str_osk = str_front_id + str_sessioin_id + string(req.OrderRef);
+//    unordered_map<string,int64_t> tmpmap ;
+//    tmpmap["ist_time"] = ist_time;
+//    seq_map_orderref[str_osk] = tmpmap;
+    //委托类操作，使用客户端定义的请求编号格式
+    int iResult = pUserApi->ReqOrderInsert(&req,nRequestID);
+    cerr << "--->>> ReqOrderInsert:" << ((iResult == 0) ? "success" : "failed") << endl;
+    string msg = "order_requestid=" + string(char_order_index) + ";orderinsert_requestid=" + string(char_query_index);
+    //LogMsg lmsg;
+    //lmsg.setMsg(msg);;
+    //logqueue.push(&lmsg);
+    LOG(INFO) << msg;
+    return 0;
+}
 void CTraderSpi::OnFrontConnected()
 {
     cerr << "--->>> " << "OnFrontConnected" << endl;
@@ -49,6 +156,7 @@ void CTraderSpi:: OnFrontDisconnected(int nReason)
 
 void CTraderSpi::OnRspUserLogin(CUstpFtdcRspUserLoginField *pRspUserLogin, CUstpFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast)
 {
+    cerr << "--->>> " << "OnRspUserLogin" << endl;
     printf("登录失败...错误原因：%s\n",pRspInfo->ErrorMsg);
 	if (pRspInfo!=NULL&&pRspInfo->ErrorID!=0)
 	{
@@ -70,17 +178,17 @@ void CTraderSpi::OnRspOrderInsert(CUstpFtdcInputOrderField *pInputOrder, CUstpFt
 	if (pRspInfo!=NULL&&pRspInfo->ErrorID!=0)
 	{
 		printf("-----------------------------\n");
-		printf("报单失败 错误原因：%s\n",pRspInfo->ErrorMsg);
+        printf("order insert failed! the reason is：%s\n",pRspInfo->ErrorMsg);
 		printf("-----------------------------\n");
 		return;
 	}
 	if(pInputOrder==NULL)
 	{
-		printf("没有报单数据\n");
+        printf("no order info!\n");
 		return;
 	}
 	printf("-----------------------------\n");
-	printf("报单成功\n");
+    printf("order insert success!!\n");
 	printf("-----------------------------\n");
 	return ;
 	
@@ -90,7 +198,7 @@ void CTraderSpi::OnRspOrderInsert(CUstpFtdcInputOrderField *pInputOrder, CUstpFt
 void CTraderSpi::OnRtnTrade(CUstpFtdcTradeField *pTrade)
 {
 	printf("-----------------------------\n");
-	printf("收到成交回报\n");
+    printf("received rtn trade\n");
 	Show(pTrade);
 	printf("-----------------------------\n");
 	return;
@@ -612,4 +720,73 @@ void CTraderSpi::OnRtnInvestorAccountDeposit(CUstpFtdcInvestorAccountDepositResF
 	printf("-----------------------------\n");
 	return ;
 
+}
+//提取投资者报单信息
+string getInvestorOrderInsertInfo(CUstpFtdcInputOrderField *order)
+{
+    ///经纪公司代码
+    char	*BrokerID = order->BrokerID;
+    ///投资者代码
+    char	*InvestorID = order->InvestorID;
+    ///合约代码
+    char	*InstrumentID = order->InstrumentID;
+    ///报单引用
+    char	*OrderRef = order->UserOrderLocalID;
+    ///用户代码
+    char	*UserID = order->UserID;
+    ///报单价格条件
+    char	OrderPriceType = order->OrderPriceType;
+    ///买卖方向
+    char	Direction[] = {order->Direction,'\0'};
+    ///组合开平标志
+    char	*CombOffsetFlag =&order->OffsetFlag;
+    ///组合投机套保标志
+    char	*CombHedgeFlag = &order->HedgeFlag;
+    ///价格
+    TUstpFtdcPriceType	limitPrice = order->LimitPrice;
+    char LimitPrice[100];
+    sprintf(LimitPrice,"%f",limitPrice);
+    ///数量
+    TUstpFtdcVolumeType	volumeTotalOriginal = order->Volume;
+    char VolumeTotalOriginal[100];
+    sprintf(VolumeTotalOriginal,"%d",volumeTotalOriginal);
+    ///有效期类型
+    TUstpFtdcTimeConditionType	TimeCondition = order->TimeCondition;
+    ///GTD日期
+    //TUstpFtdcDateType	GTDDate = order->GTDDate;
+    ///成交量类型
+    TUstpFtdcVolumeConditionType	VolumeCondition[] = {order->VolumeCondition,'\0'};
+    ///最小成交量
+    TUstpFtdcVolumeType	MinVolume = order->MinVolume;
+    ///触发条件
+    //TUstpFtdcContingentConditionType	ContingentCondition = order->ContingentCondition;
+    ///止损价
+    TUstpFtdcPriceType	StopPrice = order->StopPrice;
+    ///强平原因
+    TUstpFtdcForceCloseReasonType	ForceCloseReason = order->ForceCloseReason;
+    ///自动挂起标志
+    TUstpFtdcBoolType	IsAutoSuspend = order->IsAutoSuspend;
+    ///业务单元
+    //TUstpFtdcBusinessUnitType	BusinessUnit = order->BusinessUnit;
+    ///请求编号
+    TUstpFtdcRequestIDType	requestID = order->RequestID;
+    char RequestID[100];
+    sprintf(RequestID,"%d",requestID);
+    ///用户强评标志
+    TUstpFtdcBoolType	UserForceClose = order->ForceCloseReason;
+
+    string ordreInfo;
+    ordreInfo.append("BrokerID=").append(BrokerID);ordreInfo.append("\t");
+    ordreInfo.append("InvestorID=").append(InvestorID);ordreInfo.append("\t");
+    ordreInfo.append("InstrumentID=").append(InstrumentID);ordreInfo.append("\t");
+    ordreInfo.append("OrderRef=").append(OrderRef);ordreInfo.append("\t");
+    ordreInfo.append("UserID=").append(UserID);ordreInfo.append("\t");
+    ordreInfo.append("Direction").append(Direction);ordreInfo.append("\t");
+    ordreInfo.append("CombOffsetFlag").append(CombOffsetFlag);ordreInfo.append("\t");
+    ordreInfo.append("CombHedgeFlag").append(CombHedgeFlag);ordreInfo.append("\t");
+    ordreInfo.append("LimitPrice").append(LimitPrice);ordreInfo.append("\t");
+    ordreInfo.append("VolumeTotalOriginal").append(VolumeTotalOriginal);ordreInfo.append("\t");
+    ordreInfo.append("VolumeCondition").append(VolumeCondition);ordreInfo.append("\t");
+    ordreInfo.append("RequestID").append(RequestID);ordreInfo.append("\t");
+    return ordreInfo;
 }
