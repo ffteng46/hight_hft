@@ -6,17 +6,39 @@
 #include <unistd.h>
 #include <iostream>
 #include "globalutil.h"
+
+#include <fstream>
+#include <unordered_map>
+#include <string.h>
+#include <boost/thread/recursive_mutex.hpp>
+#include <boost/algorithm/string.hpp>
 //////////////////////////////////////////////////////////////////////
 // Construction/Destruction
 //////////////////////////////////////////////////////////////////////
 using namespace std;
-
-// UserApi¶ÔÏó
+extern unordered_map<string,unordered_map<string,int>> positionmap;
+// UserApiå¯¹è±¡
 extern CUstpFtdcTraderApi* pUserApi;
 extern FILE * g_fpRecv;
-extern int orderref;
-// ÇëÇó±àºÅ
+extern char  FRONT_ADDR;// å‰ç½®åœ°å€ æ–°æ¹–æœŸè´§
+// è¯·æ±‚ç¼–å·
 extern int iRequestID;
+extern int g_nOrdLocalID;
+extern double tick;
+extern int isclose;
+extern int offset_flag;
+extern int limit_volume;
+extern bool isrtntradeprocess;
+extern boost::lockfree::queue<LogMsg*> logqueue;
+extern unordered_map<string,unordered_map<string,int64_t>> seq_map_orderref;
+extern unordered_map<string,string> seq_map_ordersysid;
+//positionmapå¯é‡å…¥é”
+boost::recursive_mutex pst_mtx;
+//orderinsertkeyä¸ordersysidå¯¹åº”å…³ç³»é”
+boost::recursive_mutex order_mtx;
+//è®°å½•æ—¶é—´
+int ret = 0;
+int start_process = 0;
 CTraderSpi::CTraderSpi(CUstpFtdcTraderApi *pTrader):m_pUserApi(pTrader)
 {
 
@@ -27,81 +49,81 @@ CTraderSpi::~CTraderSpi()
 
 }
 
-//¼ÇÂ¼Ê±¼ä
+//è®°å½•æ—¶é—´
 int CTraderSpi::md_orderinsert(double price,char *dir,char *offset,char * ins,int ordervolume){
     TUstpFtdcUserOrderLocalIDType ORDER_REF;
     char InstrumentID[31];
     strcpy(InstrumentID,ins);
     char Direction[2];
     strcpy(Direction,dir);
-    ///Í¶»ú '1';Ì×±£'3'
+    ///æŠ•æœº '1';å¥—ä¿'3'
     char HedgeFlag[]="1";
-    //×éºÏ¿ªÆ½±êÖ¾: ¿ª²Ö '0';Æ½²Ö '1';Æ½½ñ '3';Æ½×ò '4';Ç¿Æ½ '2'
+    //ç»„åˆå¼€å¹³æ ‡å¿—: å¼€ä»“ '0';å¹³ä»“ '1';å¹³ä»Š '3';å¹³æ˜¨ '4';å¼ºå¹³ '2'
     char OffsetFlag[2];
     strcpy(OffsetFlag,offset);
-    ///¼Û¸ñ double
+    ///ä»·æ ¼ double
     TUstpFtdcPriceType Price = price;
-    //¿ª²ÖÊÖÊı
+    //å¼€ä»“æ‰‹æ•°
     int Volume = ordervolume;
-    //±¨µ¥ÒıÓÃ±àºÅ
-    sprintf(ORDER_REF,"%d",orderref);
+    //æŠ¥å•å¼•ç”¨ç¼–å·
+    sprintf(ORDER_REF,"%d",g_nOrdLocalID);
     cout<<"------->"<<ORDER_REF<<endl;
-    orderref++;
-    //±¨µ¥½á¹¹Ìå
+    g_nOrdLocalID++;
+    //æŠ¥å•ç»“æ„ä½“
     CUstpFtdcInputOrderField req;
-    ///¾­¼Í¹«Ë¾´úÂë
+    ///ç»çºªå…¬å¸ä»£ç 
     strcpy(req.BrokerID, BROKER_ID);
-    ///Í¶×ÊÕß´úÂë
+    ///æŠ•èµ„è€…ä»£ç 
     strcpy(req.InvestorID, INVESTOR_ID);
-    ///ºÏÔ¼´úÂë// UserApi¶ÔÏó
+    ///åˆçº¦ä»£ç // UserApiå¯¹è±¡
     CUstpFtdcTraderApi* pUserApi;
     strcpy(req.InstrumentID, InstrumentID);
-    ///±¨µ¥ÒıÓÃ
+    ///æŠ¥å•å¼•ç”¨
     strcpy(req.UserOrderLocalID, ORDER_REF);
 
-    ///ÓÃ»§´úÂë
+    ///ç”¨æˆ·ä»£ç 
     //	TUstpFtdcUserIDType	UserID;
     strcpy(req.UserID,INVESTOR_ID);
-    ///±¨µ¥¼Û¸ñÌõ¼ş: ÏŞ¼Û
+    ///æŠ¥å•ä»·æ ¼æ¡ä»¶: é™ä»·
     req.OrderPriceType = USTP_FTDC_OPT_LimitPrice;
-    ///ÂòÂô·½Ïò:
+    ///ä¹°å–æ–¹å‘:
     strcpy(&req.Direction,dir);
-    ///×éºÏ¿ªÆ½±êÖ¾: ¿ª²Ö
+    ///ç»„åˆå¼€å¹³æ ‡å¿—: å¼€ä»“
     strcpy(&req.OffsetFlag ,offset);
-    ///×éºÏÍ¶»úÌ×±£±êÖ¾
+    ///ç»„åˆæŠ•æœºå¥—ä¿æ ‡å¿—
     strcpy(&req.HedgeFlag,HedgeFlag);
-    ///¼Û¸ñ
+    ///ä»·æ ¼
     req.LimitPrice = Price;
-    ///ÊıÁ¿: 1
+    ///æ•°é‡: 1
     req.Volume = Volume;
-    ///ÓĞĞ§ÆÚÀàĞÍ: µ±ÈÕÓĞĞ§
+    ///æœ‰æ•ˆæœŸç±»å‹: å½“æ—¥æœ‰æ•ˆ
     //req.TimeCondition = THOST_FTDC_TC_GFD;
     req.TimeCondition = USTP_FTDC_TC_IOC;
-    ///GTDÈÕÆÚ
+    ///GTDæ—¥æœŸ
     //TUstpFtdcDateType	GTDDate;
     strcpy(req.GTDDate,"");
-    ///³É½»Á¿ÀàĞÍ: ÈÎºÎÊıÁ¿
+    ///æˆäº¤é‡ç±»å‹: ä»»ä½•æ•°é‡
     req.VolumeCondition = USTP_FTDC_VC_AV;
-    ///×î// ÇëÇó±àºÅ
+    ///æœ€// è¯·æ±‚ç¼–å·
     //int iRequestID = 0;
-    //Ğ¡³É½»Á¿: 1
+    //å°æˆäº¤é‡: 1
     req.MinVolume = 1;
-    ///´¥·¢Ìõ¼ş: Á¢¼´
+    ///è§¦å‘æ¡ä»¶: ç«‹å³
     //req.ContingentCondition = THOST_FTDC_CC_Immediately;
-    ///Ö¹Ëğ¼Û
+    ///æ­¢æŸä»·
     //TUstpFtdcPriceType	StopPrice;
     req.StopPrice = 0;
-    ///Ç¿Æ½Ô­Òò: ·ÇÇ¿Æ½
+    ///å¼ºå¹³åŸå› : éå¼ºå¹³
     req.ForceCloseReason = USTP_FTDC_FCR_NotForceClose;
-    ///×Ô¶¯¹ÒÆğ±êÖ¾: ·ñ
+    ///è‡ªåŠ¨æŒ‚èµ·æ ‡å¿—: å¦
     req.IsAutoSuspend = 0;
-    ///ÒµÎñµ¥Ôª
+    ///ä¸šåŠ¡å•å…ƒ
     //	TUstpFtdcBusinessUnitType	BusinessUnit;
     strcpy(req.BusinessUnit,"");
-    ///ÇëÇó±àºÅ
+    ///è¯·æ±‚ç¼–å·
     //	TUstpFtdcRequestIDType	RequestID;
-    ///ÓÃ»§Ç¿ÆÀ±êÖ¾: ·ñ
-    //req.UserForceClose = 0;///¾­¼Í¹«Ë¾´úÂë
+    ///ç”¨æˆ·å¼ºè¯„æ ‡å¿—: å¦
+    //req.UserForceClose = 0;///ç»çºªå…¬å¸ä»£ç 
     //
 
     int nRequestID = ++iRequestID;
@@ -113,14 +135,14 @@ int CTraderSpi::md_orderinsert(double price,char *dir,char *offset,char * ins,in
     char char_query_index[10]={'\0'};
     sprintf(char_query_index,"%d",nRequestID);
 
-    //ÏÂµ¥¿ªÊ¼Ê±¼ä
+    //ä¸‹å•å¼€å§‹æ—¶é—´
 //    int64_t ist_time = GetSysTimeMicros();
     //orderinsertkey
-//    string str_osk = str_front_id + str_sessioin_id + string(req.OrderRef);
+//    string str_osk = str_front_id + str_sessioin_id + string(req.g_nOrdLocalID);
 //    unordered_map<string,int64_t> tmpmap ;
 //    tmpmap["ist_time"] = ist_time;
-//    seq_map_orderref[str_osk] = tmpmap;
-    //Î¯ÍĞÀà²Ù×÷£¬Ê¹ÓÃ¿Í»§¶Ë¶¨ÒåµÄÇëÇó±àºÅ¸ñÊ½
+//    seq_map_g_nOrdLocalID[str_osk] = tmpmap;
+    //å§”æ‰˜ç±»æ“ä½œï¼Œä½¿ç”¨å®¢æˆ·ç«¯å®šä¹‰çš„è¯·æ±‚ç¼–å·æ ¼å¼
     int iResult = pUserApi->ReqOrderInsert(&req,nRequestID);
     cerr << "--->>> ReqOrderInsert:" << ((iResult == 0) ? "success" : "failed") << endl;
     string msg = "order_requestid=" + string(char_order_index) + ";orderinsert_requestid=" + string(char_query_index);
@@ -133,52 +155,161 @@ int CTraderSpi::md_orderinsert(double price,char *dir,char *offset,char * ins,in
 void CTraderSpi::OnFrontConnected()
 {
     cerr << "--->>> " << "OnFrontConnected" << endl;
-	CUstpFtdcReqUserLoginField reqUserLogin;
-	memset(&reqUserLogin,0,sizeof(CUstpFtdcReqUserLoginField));		
+    ///ç”¨æˆ·ç™»å½•è¯·æ±‚;
+    ReqUserLogin();
+
+}
+void CTraderSpi::ReqUserLogin()
+{
+
+
+
+    cout<<PASSWORD<<":"<<BROKER_ID<<" "<<INVESTOR_ID<<" "<<PASSWORD<<endl;
+    char char_msg[1024];
+    sprintf(char_msg, "å‘é€ç”¨æˆ·ç™»å½•è¯·æ±‚:BROKER_ID:%s;INVESTOR_ID:%s;PASSWORD:%s",BROKER_ID, INVESTOR_ID,PASSWORD);
+    string msg=string(char_msg);
+    LOG(INFO)<<msg;
+    cout << "BROKER_ID:"<< BROKER_ID<<";INVESTOR_ID:"<<INVESTOR_ID<<";PASSWORD="<<PASSWORD <<endl;
+
+    cerr << "hello" <<endl;
+    CUstpFtdcReqUserLoginField reqUserLogin;
+    memset(&reqUserLogin,0,sizeof(CUstpFtdcReqUserLoginField));
     strcpy(reqUserLogin.BrokerID,BROKER_ID);
     strcpy(reqUserLogin.UserID, INVESTOR_ID);
     strcpy(reqUserLogin.Password, PASSWORD);
-	strcpy(reqUserLogin.UserProductInfo,g_pProductInfo);		
-	m_pUserApi->ReqUserLogin(&reqUserLogin, g_nOrdLocalID);	
-	
-    printf("ÇëÇóµÇÂ¼£¬BrokerID=[%s]UserID=[%s]\n",BROKER_ID,INVESTOR_ID);
+    strcpy(reqUserLogin.UserProductInfo,"");
+    int iResult = m_pUserApi->ReqUserLogin(&reqUserLogin, ++iRequestID);
+//    m_pUserApi->ReqUserLogin(&reqUserLogin, g_nOrdLocalID);
+//    CThostFtdcReqUserLoginField req;
+//    //memset(&req, 0, sizeof(req));
+//    strcpy(req.BrokerID, BROKER_ID);
+//    strcpy(req.UserID, INVESTOR_ID);
+//    strcpy(req.Password, PASSWORD);
+//    int iResult = pUserApi->ReqUserLogin(&req, ++iRequestID);
+    printf("è¯·æ±‚ç™»å½•ï¼ŒBrokerID=[%s]UserID=[%s]\n",BROKER_ID,INVESTOR_ID);
+    cerr << "--->>> å‘é€ç”¨æˆ·ç™»å½•è¯·æ±‚: " << ((iResult == 0) ? "æˆåŠŸ" : "å¤±è´¥") << endl;
 #ifdef WIN32
-	Sleep(1000);
+    Sleep(1000);
 #else
-	usleep(1000);
+    usleep(1000);
 #endif
+
 }
+//å‰ç½®äº†æ–­å¼€
 void CTraderSpi:: OnFrontDisconnected(int nReason)
 {
-    cerr << "--->>> " << "OnFrontDisconnected" << endl;
-    cerr << "--->>> Reason = " << nReason << endl;
+    cerr << "OnFrontDisconnected "<<FRONT_ADDR ;
+    char char_msg[1028] = {'\0'};
+    if(nReason == 4097){
+        cerr << "--->>>å‰ç½®è¿æ¥å¤±è´¥ï¼š Reason = " << nReason <<",ç½‘ç»œè¯»å¤±è´¥";
+        sprintf(char_msg,"--->>>å‰ç½®è¿æ¥å¤±è´¥ï¼š Reason = %d,ç½‘ç»œè¯»å¤±è´¥",nReason);
+    }else if(nReason == 4098){
+        cerr << "--->>>å‰ç½®è¿æ¥å¤±è´¥ï¼š Reason = " << nReason <<",ç½‘ç»œå†™å¤±è´¥";
+    }if(nReason == 8193){
+        cerr << "--->>>å‰ç½®è¿æ¥å¤±è´¥ï¼š Reason = " << nReason <<",æ¥å—å¿ƒè·³è¶…æ—¶";
+    }if(nReason == 8194){
+        cerr << "--->>>å‰ç½®è¿æ¥å¤±è´¥ï¼š Reason = " << nReason <<",å‘é€å¿ƒè·³å¤±è´¥";
+    }if(nReason == 8195){
+        cerr << "--->>>å‰ç½®è¿æ¥å¤±è´¥ï¼š Reason = " << nReason <<",æ”¶åˆ°é”™è¯¯æŠ¥æ–‡";
+    }
+//    LogMsg d;
+    string msg2 = boosttoolsnamespace::CBoostTools::gbktoutf8(string(char_msg));
+    /*d.setMsg(msg2);
+//    logqueue.push( &d */
+    LOG(INFO)<<msg2;
+    sleep(200);
 }
-
 void CTraderSpi::OnRspUserLogin(CUstpFtdcRspUserLoginField *pRspUserLogin, CUstpFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast)
 {
     cerr << "--->>> " << "OnRspUserLogin" << endl;
-    printf("µÇÂ¼Ê§°Ü...´íÎóÔ­Òò£º%s\n",pRspInfo->ErrorMsg);
-	if (pRspInfo!=NULL&&pRspInfo->ErrorID!=0)
+    printf("ç™»å½•å¤±è´¥...é”™è¯¯åŸå› ï¼š%s\n",pRspInfo->ErrorMsg);
+    if (bIsLast && !IsErrorRspInfo(pRspInfo))
+    //if (pRspInfo!=NULL&&pRspInfo->ErrorID!=0)
 	{
-		printf("-----------------------------\n");
-		printf("µÇÂ¼Ê§°Ü...´íÎóÔ­Òò£º%s\n",pRspInfo->ErrorMsg);
-		printf("-----------------------------\n");
-		return;
-	}
-	g_nOrdLocalID=atoi(pRspUserLogin->MaxOrderLocalID)+1;
- 	printf("-----------------------------\n");
- 	printf("µÇÂ¼³É¹¦£¬×î´ó±¾µØ±¨µ¥ºÅ:%d\n",g_nOrdLocalID);
- 	printf("-----------------------------\n");
+        g_nOrdLocalID=atoi(pRspUserLogin->MaxOrderLocalID)+1;
+        printf("-----------------------------\n");
+        printf("ç™»å½•æˆåŠŸï¼Œæœ€å¤§æœ¬åœ°æŠ¥å•å·:%d\n",g_nOrdLocalID);
+        printf("-----------------------------\n");
+        //è¯·æ±‚å“åº”æ—¥å¿—
+        char char_msg[1024] = {'\0'};
+        sprintf(char_msg,"--->>>ç™»é™†æˆåŠŸï¼Œ è·å–å½“å‰äº¤æ˜“æ—¥ = %s,è·å–å½“å‰æŠ¥å•å¼•ç”¨ =%d",pUserApi->GetTradingDay(),g_nOrdLocalID );
+        string msg(char_msg);
+        LOG(INFO)<<msg;
+        //ReqQryInvestorPosition();
+        ///æŠ•èµ„è€…ç»“ç®—ç»“æœç¡®è®¤;
+        cout<<msg<<endl;
+        ReqQryInvestorPosition();
+    }else{
+        printf("-----------------------------\n");
+        printf("ç™»å½•å¤±è´¥...é”™è¯¯åŸå› ï¼š%s\n",pRspInfo->ErrorMsg);
+        printf("-----------------------------\n");
+        return;
+    }
 
- 	StartAutoOrder();
+    StartAutoOrder();
 }
+void CTraderSpi::ReqQryInvestorPosition()
+{
+    CUstpFtdcQryInvestorPositionField req;
+    memset(&req, 0, sizeof(req));
+    strcpy(req.BrokerID, BROKER_ID);
+    strcpy(req.InvestorID, INVESTOR_ID);
+    //strcpy(req.InstrumentID, INSTRUMENT_ID);
+    int iResult = pUserApi->ReqQryInvestorPosition(&req, ++g_nOrdLocalID);
 
+    cerr << "--->>> è¯·æ±‚æŸ¥è¯¢æŠ•èµ„è€…æŒä»“: " << ((iResult == 0) ? "æˆåŠŸ" : "å¤±è´¥") << endl;
+    //å‘é€è¯·æ±‚æ—¥å¿—
+    char char_msg[1024];
+    sprintf(char_msg, "--->>> å‘é€è¯·æ±‚æŸ¥è¯¢æŠ•èµ„è€…æŒä»“: %s", ((iResult == 0) ? "æˆåŠŸ" : "å¤±è´¥"));
+    string msg(char_msg);
+    LOG(INFO)<<msg;
+    //logqueue.push(&logmsg);
+}
+//æŸ¥è¯¢æŠ•èµ„è€…æŒä»“
+void CTraderSpi::OnRspQryInvestorPosition(CUstpFtdcRspInvestorPositionField *pRspInvestorPosition, CUstpFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast)
+{
+    cerr << "--->>> " << "OnRspQryInvestorPosition" << endl;
+    if(!IsErrorRspInfo(pRspInfo) && pRspInvestorPosition){
+        initpst(pRspInvestorPosition);
+    }
+    if (bIsLast && !IsErrorRspInfo(pRspInfo))
+    {
+
+        int isbeginmk = 0;
+        unordered_map<string,unordered_map<string,int>>::iterator tmpit = positionmap.begin();
+        for(;tmpit != positionmap.end();tmpit ++){
+            string str_instrument = tmpit->first;
+            unordered_map<string,int> tmppst = tmpit->second;
+            int longpst = tmppst["longTotalPosition"];
+            int shortpst = tmppst["shortTotalPosition"];
+            char char_longpst[12] = {'\0'};
+            char char_shortpst[12] = {'\0'};
+            sprintf(char_longpst,"%d",longpst);
+            sprintf(char_shortpst,"%d",shortpst);
+            string pst_msg = "æŒä»“ç»“æ„:"+str_instrument + ",å¤šå¤´æŒä»“é‡=" + string(char_longpst) + ",ç©ºå¤´æŒä»“é‡=" + string(char_shortpst) ;
+            cout<<pst_msg<<endl;
+            LOG(INFO)<<pst_msg;
+        }
+        cout<<"æ˜¯å¦å¯åŠ¨ç­–ç•¥ç¨‹åº?0 å¦ï¼Œ1æ˜¯"<<endl;
+        cin>>isbeginmk;
+        if(isbeginmk == 1){
+            start_process = 1;
+            isrtntradeprocess = true;
+            // åˆå§‹åŒ–UserApi
+//            mduserapi = CThostFtdcMdApi::CreateFtdcMdApi();			// åˆ›å»ºUserApi
+//            CThostFtdcMdSpi* pUserSpi = new CMdSpi();
+//            mduserapi->RegisterSpi(pUserSpi);						// æ³¨å†Œäº‹ä»¶ç±»
+//            mduserapi->RegisterFront(MD_FRONT_ADDR);					// connect
+//            mduserapi->Init();
+        }
+    }
+}
 void CTraderSpi::OnRspOrderInsert(CUstpFtdcInputOrderField *pInputOrder, CUstpFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast)
 {
 	if (pRspInfo!=NULL&&pRspInfo->ErrorID!=0)
 	{
 		printf("-----------------------------\n");
-        printf("order insert failed! the reason is£º%s\n",pRspInfo->ErrorMsg);
+        printf("order insert failed! the reason isï¼š%s\n",pRspInfo->ErrorMsg);
 		printf("-----------------------------\n");
 		return;
 	}
@@ -207,32 +338,32 @@ void CTraderSpi::OnRtnTrade(CUstpFtdcTradeField *pTrade)
 void CTraderSpi::Show(CUstpFtdcOrderField *pOrder)
 {
 	printf("-----------------------------\n");
-	printf("½»Ò×Ëù´úÂë=[%s]\n",pOrder->ExchangeID);
-	printf("½»Ò×ÈÕ=[%s]\n",pOrder->TradingDay);
-	printf("»áÔ±±àºÅ=[%s]\n",pOrder->ParticipantID);
-	printf("ÏÂµ¥Ï¯Î»ºÅ=[%s]\n",pOrder->SeatID);
-	printf("Í¶×ÊÕß±àºÅ=[%s]\n",pOrder->InvestorID);
-	printf("¿Í»§ºÅ=[%s]\n",pOrder->ClientID);
-	printf("ÏµÍ³±¨µ¥±àºÅ=[%s]\n",pOrder->OrderSysID);
-	printf("±¾µØ±¨µ¥±àºÅ=[%s]\n",pOrder->OrderLocalID);
-	printf("ÓÃ»§±¾µØ±¨µ¥ºÅ=[%s]\n",pOrder->UserOrderLocalID);
-	printf("ºÏÔ¼´úÂë=[%s]\n",pOrder->InstrumentID);
-	printf("±¨µ¥¼Û¸ñÌõ¼ş=[%c]\n",pOrder->OrderPriceType);
-	printf("ÂòÂô·½Ïò=[%c]\n",pOrder->Direction);
-	printf("¿ªÆ½±êÖ¾=[%c]\n",pOrder->OffsetFlag);
-	printf("Í¶»úÌ×±£±êÖ¾=[%c]\n",pOrder->HedgeFlag);
-	printf("¼Û¸ñ=[%lf]\n",pOrder->LimitPrice);
-	printf("ÊıÁ¿=[%d]\n",pOrder->Volume);
-	printf("±¨µ¥À´Ô´=[%c]\n",pOrder->OrderSource);
-	printf("±¨µ¥×´Ì¬=[%c]\n",pOrder->OrderStatus);
-	printf("±¨µ¥Ê±¼ä=[%s]\n",pOrder->InsertTime);
-	printf("³·ÏúÊ±¼ä=[%s]\n",pOrder->CancelTime);
-	printf("ÓĞĞ§ÆÚÀàĞÍ=[%c]\n",pOrder->TimeCondition);
-	printf("GTDÈÕÆÚ=[%s]\n",pOrder->GTDDate);
-	printf("×îĞ¡³É½»Á¿=[%d]\n",pOrder->MinVolume);
-	printf("Ö¹Ëğ¼Û=[%lf]\n",pOrder->StopPrice);
-	printf("Ç¿Æ½Ô­Òò=[%c]\n",pOrder->ForceCloseReason);
-	printf("×Ô¶¯¹ÒÆğ±êÖ¾=[%d]\n",pOrder->IsAutoSuspend);
+	printf("äº¤æ˜“æ‰€ä»£ç =[%s]\n",pOrder->ExchangeID);
+	printf("äº¤æ˜“æ—¥=[%s]\n",pOrder->TradingDay);
+	printf("ä¼šå‘˜ç¼–å·=[%s]\n",pOrder->ParticipantID);
+	printf("ä¸‹å•å¸­ä½å·=[%s]\n",pOrder->SeatID);
+	printf("æŠ•èµ„è€…ç¼–å·=[%s]\n",pOrder->InvestorID);
+	printf("å®¢æˆ·å·=[%s]\n",pOrder->ClientID);
+	printf("ç³»ç»ŸæŠ¥å•ç¼–å·=[%s]\n",pOrder->OrderSysID);
+	printf("æœ¬åœ°æŠ¥å•ç¼–å·=[%s]\n",pOrder->OrderLocalID);
+	printf("ç”¨æˆ·æœ¬åœ°æŠ¥å•å·=[%s]\n",pOrder->UserOrderLocalID);
+	printf("åˆçº¦ä»£ç =[%s]\n",pOrder->InstrumentID);
+	printf("æŠ¥å•ä»·æ ¼æ¡ä»¶=[%c]\n",pOrder->OrderPriceType);
+	printf("ä¹°å–æ–¹å‘=[%c]\n",pOrder->Direction);
+	printf("å¼€å¹³æ ‡å¿—=[%c]\n",pOrder->OffsetFlag);
+	printf("æŠ•æœºå¥—ä¿æ ‡å¿—=[%c]\n",pOrder->HedgeFlag);
+	printf("ä»·æ ¼=[%lf]\n",pOrder->LimitPrice);
+	printf("æ•°é‡=[%d]\n",pOrder->Volume);
+	printf("æŠ¥å•æ¥æº=[%c]\n",pOrder->OrderSource);
+	printf("æŠ¥å•çŠ¶æ€=[%c]\n",pOrder->OrderStatus);
+	printf("æŠ¥å•æ—¶é—´=[%s]\n",pOrder->InsertTime);
+	printf("æ’¤é”€æ—¶é—´=[%s]\n",pOrder->CancelTime);
+	printf("æœ‰æ•ˆæœŸç±»å‹=[%c]\n",pOrder->TimeCondition);
+	printf("GTDæ—¥æœŸ=[%s]\n",pOrder->GTDDate);
+	printf("æœ€å°æˆäº¤é‡=[%d]\n",pOrder->MinVolume);
+	printf("æ­¢æŸä»·=[%lf]\n",pOrder->StopPrice);
+	printf("å¼ºå¹³åŸå› =[%c]\n",pOrder->ForceCloseReason);
+	printf("è‡ªåŠ¨æŒ‚èµ·æ ‡å¿—=[%d]\n",pOrder->IsAutoSuspend);
 	printf("-----------------------------\n");
 	return ;
 }
@@ -240,7 +371,7 @@ void CTraderSpi::Show(CUstpFtdcOrderField *pOrder)
 void CTraderSpi::OnRtnOrder(CUstpFtdcOrderField *pOrder)
 {
 	printf("-----------------------------\n");
-	printf("ÊÕµ½±¨µ¥»Ø±¨\n");
+	printf("æ”¶åˆ°æŠ¥å•å›æŠ¥\n");
 	Show(pOrder);
 	printf("-----------------------------\n");
 	return ;
@@ -251,17 +382,17 @@ void CTraderSpi::OnRspOrderAction(CUstpFtdcOrderActionField *pOrderAction, CUstp
 	if (pRspInfo!=NULL&&pRspInfo->ErrorID!=0)
 	{
 		printf("-----------------------------\n");
-		printf("³·µ¥Ê§°Ü ´íÎóÔ­Òò£º%s\n",pRspInfo->ErrorMsg);
+		printf("æ’¤å•å¤±è´¥ é”™è¯¯åŸå› ï¼š%s\n",pRspInfo->ErrorMsg);
 		printf("-----------------------------\n");
 		return;
 	}
 	if(pOrderAction==NULL)
 	{
-		printf("Ã»ÓĞ³·µ¥Êı¾İ\n");
+		printf("æ²¡æœ‰æ’¤å•æ•°æ®\n");
 		return;
 	}
 	printf("-----------------------------\n");
-	printf("³·µ¥³É¹¦\n");
+	printf("æ’¤å•æˆåŠŸ\n");
 	printf("-----------------------------\n");
 	return ;
 }
@@ -270,17 +401,17 @@ void CTraderSpi::OnRspUserPasswordUpdate(CUstpFtdcUserPasswordUpdateField *pUser
 	if (pRspInfo!=NULL&&pRspInfo->ErrorID!=0)
 	{
 		printf("-----------------------------\n");
-		printf("ĞŞ¸ÄÃÜÂëÊ§°Ü ´íÎóÔ­Òò£º%s\n",pRspInfo->ErrorMsg);
+		printf("ä¿®æ”¹å¯†ç å¤±è´¥ é”™è¯¯åŸå› ï¼š%s\n",pRspInfo->ErrorMsg);
 		printf("-----------------------------\n");
 		return;
 	}
 	if(pUserPasswordUpdate==NULL)
 	{
-		printf("Ã»ÓĞĞŞ¸ÄÃÜÂëÊı¾İ\n");
+		printf("æ²¡æœ‰ä¿®æ”¹å¯†ç æ•°æ®\n");
 		return;
 	}
 	printf("-----------------------------\n");
-	printf("ĞŞ¸ÄÃÜÂë³É¹¦\n");
+	printf("ä¿®æ”¹å¯†ç æˆåŠŸ\n");
 	printf("-----------------------------\n");
 	return ;
 }
@@ -290,17 +421,17 @@ void CTraderSpi::OnErrRtnOrderInsert(CUstpFtdcInputOrderField *pInputOrder, CUst
 	if (pRspInfo!=NULL&&pRspInfo->ErrorID!=0)
 	{
 		printf("-----------------------------\n");
-		printf("±¨µ¥´íÎó»Ø±¨Ê§°Ü ´íÎóÔ­Òò£º%s\n",pRspInfo->ErrorMsg);
+		printf("æŠ¥å•é”™è¯¯å›æŠ¥å¤±è´¥ é”™è¯¯åŸå› ï¼š%s\n",pRspInfo->ErrorMsg);
 		printf("-----------------------------\n");
 		return;
 	}
 	if(pInputOrder==NULL)
 	{
-		printf("Ã»ÓĞÊı¾İ\n");
+		printf("æ²¡æœ‰æ•°æ®\n");
 		return;
 	}
 	printf("-----------------------------\n");
-	printf("±¨µ¥´íÎó»Ø±¨\n");
+	printf("æŠ¥å•é”™è¯¯å›æŠ¥\n");
 	printf("-----------------------------\n");
 	return ;
 }
@@ -309,17 +440,17 @@ void CTraderSpi::OnErrRtnOrderAction(CUstpFtdcOrderActionField *pOrderAction, CU
 	if (pRspInfo!=NULL&&pRspInfo->ErrorID!=0)
 	{
 		printf("-----------------------------\n");
-		printf("³·µ¥´íÎó»Ø±¨Ê§°Ü ´íÎóÔ­Òò£º%s\n",pRspInfo->ErrorMsg);
+		printf("æ’¤å•é”™è¯¯å›æŠ¥å¤±è´¥ é”™è¯¯åŸå› ï¼š%s\n",pRspInfo->ErrorMsg);
 		printf("-----------------------------\n");
 		return;
 	}
 	if(pOrderAction==NULL)
 	{
-		printf("Ã»ÓĞÊı¾İ\n");
+		printf("æ²¡æœ‰æ•°æ®\n");
 		return;
 	}
 	printf("-----------------------------\n");
-	printf("³·µ¥´íÎó»Ø±¨\n");
+	printf("æ’¤å•é”™è¯¯å›æŠ¥\n");
 	printf("-----------------------------\n");
 	return ;
 }
@@ -329,13 +460,13 @@ void CTraderSpi::OnRspQryOrder(CUstpFtdcOrderField *pOrder, CUstpFtdcRspInfoFiel
 	if (pRspInfo!=NULL&&pRspInfo->ErrorID!=0)
 	{
 		printf("-----------------------------\n");
-		printf("²éÑ¯±¨µ¥Ê§°Ü ´íÎóÔ­Òò£º%s\n",pRspInfo->ErrorMsg);
+		printf("æŸ¥è¯¢æŠ¥å•å¤±è´¥ é”™è¯¯åŸå› ï¼š%s\n",pRspInfo->ErrorMsg);
 		printf("-----------------------------\n");
 		return;
 	}
 	if(pOrder==NULL)
 	{
-		printf("Ã»ÓĞ²éÑ¯µ½±¨µ¥Êı¾İ\n");
+		printf("æ²¡æœ‰æŸ¥è¯¢åˆ°æŠ¥å•æ•°æ®\n");
 		return;
 	}
 	Show(pOrder);
@@ -344,22 +475,22 @@ void CTraderSpi::OnRspQryOrder(CUstpFtdcOrderField *pOrder, CUstpFtdcRspInfoFiel
 void CTraderSpi::Show(CUstpFtdcTradeField *pTrade)
 {
 	printf("-----------------------------\n");
-	printf("½»Ò×Ëù´úÂë=[%s]\n",pTrade->ExchangeID);
-	printf("½»Ò×ÈÕ=[%s]\n",pTrade->TradingDay);
-	printf("»áÔ±±àºÅ=[%s]\n",pTrade->ParticipantID);
-	printf("ÏÂµ¥Ï¯Î»ºÅ=[%s]\n",pTrade->SeatID);
-	printf("Í¶×ÊÕß±àºÅ=[%s]\n",pTrade->InvestorID);
-	printf("¿Í»§ºÅ=[%s]\n",pTrade->ClientID);
-	printf("³É½»±àºÅ=[%s]\n",pTrade->TradeID);
+	printf("äº¤æ˜“æ‰€ä»£ç =[%s]\n",pTrade->ExchangeID);
+	printf("äº¤æ˜“æ—¥=[%s]\n",pTrade->TradingDay);
+	printf("ä¼šå‘˜ç¼–å·=[%s]\n",pTrade->ParticipantID);
+	printf("ä¸‹å•å¸­ä½å·=[%s]\n",pTrade->SeatID);
+	printf("æŠ•èµ„è€…ç¼–å·=[%s]\n",pTrade->InvestorID);
+	printf("å®¢æˆ·å·=[%s]\n",pTrade->ClientID);
+	printf("æˆäº¤ç¼–å·=[%s]\n",pTrade->TradeID);
 
-	printf("ÓÃ»§±¾µØ±¨µ¥ºÅ=[%s]\n",pTrade->UserOrderLocalID);
-	printf("ºÏÔ¼´úÂë=[%s]\n",pTrade->InstrumentID);
-	printf("ÂòÂô·½Ïò=[%c]\n",pTrade->Direction);
-	printf("¿ªÆ½±êÖ¾=[%c]\n",pTrade->OffsetFlag);
-	printf("Í¶»úÌ×±£±êÖ¾=[%c]\n",pTrade->HedgeFlag);
-	printf("³É½»¼Û¸ñ=[%lf]\n",pTrade->TradePrice);
-	printf("³É½»ÊıÁ¿=[%d]\n",pTrade->TradeVolume);
-	printf("ÇåËã»áÔ±±àºÅ=[%s]\n",pTrade->ClearingPartID);
+	printf("ç”¨æˆ·æœ¬åœ°æŠ¥å•å·=[%s]\n",pTrade->UserOrderLocalID);
+	printf("åˆçº¦ä»£ç =[%s]\n",pTrade->InstrumentID);
+	printf("ä¹°å–æ–¹å‘=[%c]\n",pTrade->Direction);
+	printf("å¼€å¹³æ ‡å¿—=[%c]\n",pTrade->OffsetFlag);
+	printf("æŠ•æœºå¥—ä¿æ ‡å¿—=[%c]\n",pTrade->HedgeFlag);
+	printf("æˆäº¤ä»·æ ¼=[%lf]\n",pTrade->TradePrice);
+	printf("æˆäº¤æ•°é‡=[%d]\n",pTrade->TradeVolume);
+	printf("æ¸…ç®—ä¼šå‘˜ç¼–å·=[%s]\n",pTrade->ClearingPartID);
 	
 	printf("-----------------------------\n");
 	return ;
@@ -369,13 +500,13 @@ void CTraderSpi::OnRspQryTrade(CUstpFtdcTradeField *pTrade, CUstpFtdcRspInfoFiel
 	if (pRspInfo!=NULL&&pRspInfo->ErrorID!=0)
 	{
 		printf("-----------------------------\n");
-		printf("²éÑ¯³É½»Ê§°Ü ´íÎóÔ­Òò£º%s\n",pRspInfo->ErrorMsg);
+		printf("æŸ¥è¯¢æˆäº¤å¤±è´¥ é”™è¯¯åŸå› ï¼š%s\n",pRspInfo->ErrorMsg);
 		printf("-----------------------------\n");
 		return;
 	}
 	if(pTrade==NULL)
 	{
-		printf("Ã»ÓĞ²éÑ¯µ½³É½»Êı¾İ");
+		printf("æ²¡æœ‰æŸ¥è¯¢åˆ°æˆäº¤æ•°æ®");
 		return;
 	}
 	Show(pTrade);
@@ -386,13 +517,13 @@ void CTraderSpi::OnRspQryExchange(CUstpFtdcRspExchangeField *pRspExchange, CUstp
 	if (pRspInfo!=NULL&&pRspInfo->ErrorID!=0)
 	{
 		printf("-----------------------------\n");
-		printf("²éÑ¯½»Ò×ËùÊ§°Ü ´íÎóÔ­Òò£º%s\n",pRspInfo->ErrorMsg);
+		printf("æŸ¥è¯¢äº¤æ˜“æ‰€å¤±è´¥ é”™è¯¯åŸå› ï¼š%s\n",pRspInfo->ErrorMsg);
 		printf("-----------------------------\n");
 		return;
 	}
 	if (pRspExchange==NULL)
 	{
-		printf("Ã»ÓĞ²éÑ¯µ½½»Ò×ËùĞÅÏ¢\n");
+		printf("æ²¡æœ‰æŸ¥è¯¢åˆ°äº¤æ˜“æ‰€ä¿¡æ¯\n");
 		return ;
 	}
 	printf("-----------------------------\n");
@@ -407,32 +538,32 @@ void CTraderSpi::OnRspQryInvestorAccount(CUstpFtdcRspInvestorAccountField *pRspI
 	if (pRspInfo!=NULL&&pRspInfo->ErrorID!=0)
 	{
 		printf("-----------------------------\n");
-		printf("²éÑ¯Í¶×ÊÕßÕË»§Ê§°Ü ´íÎóÔ­Òò£º%s\n",pRspInfo->ErrorMsg);
+		printf("æŸ¥è¯¢æŠ•èµ„è€…è´¦æˆ·å¤±è´¥ é”™è¯¯åŸå› ï¼š%s\n",pRspInfo->ErrorMsg);
 		printf("-----------------------------\n");
 		return;
 	}
 	
 	if (pRspInvestorAccount==NULL)
 	{
-		printf("Ã»ÓĞ²éÑ¯µ½Í¶×ÊÕßÕË»§\n");
+		printf("æ²¡æœ‰æŸ¥è¯¢åˆ°æŠ•èµ„è€…è´¦æˆ·\n");
 		return ;
 	}
 	printf("-----------------------------\n");
-	printf("Í¶×ÊÕß±àºÅ=[%s]\n",pRspInvestorAccount->InvestorID);
-	printf("×Ê½ğÕÊºÅ=[%s]\n",pRspInvestorAccount->AccountID);
-	printf("ÉÏ´Î½áËã×¼±¸½ğ=[%lf]\n",pRspInvestorAccount->PreBalance);
-	printf("Èë½ğ½ğ¶î=[%lf]\n",pRspInvestorAccount->Deposit);
-	printf("³ö½ğ½ğ¶î=[%lf]\n",pRspInvestorAccount->Withdraw);
-	printf("¶³½áµÄ±£Ö¤½ğ=[%lf]\n",pRspInvestorAccount->FrozenMargin);
-	printf("¶³½áÊÖĞø·Ñ=[%lf]\n",pRspInvestorAccount->FrozenFee);
-	printf("ÊÖĞø·Ñ=[%lf]\n",pRspInvestorAccount->Fee);
-	printf("Æ½²ÖÓ¯¿÷=[%lf]\n",pRspInvestorAccount->CloseProfit);
-	printf("³Ö²ÖÓ¯¿÷=[%lf]\n",pRspInvestorAccount->PositionProfit);
-	printf("¿ÉÓÃ×Ê½ğ=[%lf]\n",pRspInvestorAccount->Available);
-	printf("¶àÍ·¶³½áµÄ±£Ö¤½ğ=[%lf]\n",pRspInvestorAccount->LongFrozenMargin);
-	printf("¿ÕÍ·¶³½áµÄ±£Ö¤½ğ=[%lf]\n",pRspInvestorAccount->ShortFrozenMargin);
-	printf("¶àÍ·±£Ö¤½ğ=[%lf]\n",pRspInvestorAccount->LongMargin);
-	printf("¿ÕÍ·±£Ö¤½ğ=[%lf]\n",pRspInvestorAccount->ShortMargin);
+	printf("æŠ•èµ„è€…ç¼–å·=[%s]\n",pRspInvestorAccount->InvestorID);
+	printf("èµ„é‡‘å¸å·=[%s]\n",pRspInvestorAccount->AccountID);
+	printf("ä¸Šæ¬¡ç»“ç®—å‡†å¤‡é‡‘=[%lf]\n",pRspInvestorAccount->PreBalance);
+	printf("å…¥é‡‘é‡‘é¢=[%lf]\n",pRspInvestorAccount->Deposit);
+	printf("å‡ºé‡‘é‡‘é¢=[%lf]\n",pRspInvestorAccount->Withdraw);
+	printf("å†»ç»“çš„ä¿è¯é‡‘=[%lf]\n",pRspInvestorAccount->FrozenMargin);
+	printf("å†»ç»“æ‰‹ç»­è´¹=[%lf]\n",pRspInvestorAccount->FrozenFee);
+	printf("æ‰‹ç»­è´¹=[%lf]\n",pRspInvestorAccount->Fee);
+	printf("å¹³ä»“ç›ˆäº=[%lf]\n",pRspInvestorAccount->CloseProfit);
+	printf("æŒä»“ç›ˆäº=[%lf]\n",pRspInvestorAccount->PositionProfit);
+	printf("å¯ç”¨èµ„é‡‘=[%lf]\n",pRspInvestorAccount->Available);
+	printf("å¤šå¤´å†»ç»“çš„ä¿è¯é‡‘=[%lf]\n",pRspInvestorAccount->LongFrozenMargin);
+	printf("ç©ºå¤´å†»ç»“çš„ä¿è¯é‡‘=[%lf]\n",pRspInvestorAccount->ShortFrozenMargin);
+	printf("å¤šå¤´ä¿è¯é‡‘=[%lf]\n",pRspInvestorAccount->LongMargin);
+	printf("ç©ºå¤´ä¿è¯é‡‘=[%lf]\n",pRspInvestorAccount->ShortMargin);
 	printf("-----------------------------\n");
 
 }
@@ -442,7 +573,7 @@ void CTraderSpi::OnRspQryUserInvestor(CUstpFtdcRspUserInvestorField *pUserInvest
 	if (pRspInfo!=NULL&&pRspInfo->ErrorID!=0)
 	{
 		printf("-----------------------------\n");
-		printf("²éÑ¯¿ÉÓÃÍ¶×ÊÕßÊ§°Ü ´íÎóÔ­Òò£º%s\n",pRspInfo->ErrorMsg);
+		printf("æŸ¥è¯¢å¯ç”¨æŠ•èµ„è€…å¤±è´¥ é”™è¯¯åŸå› ï¼š%s\n",pRspInfo->ErrorMsg);
 		printf("-----------------------------\n");
 		return;
 	}
@@ -458,39 +589,39 @@ void CTraderSpi::OnRspQryUserInvestor(CUstpFtdcRspUserInvestorField *pUserInvest
 void CTraderSpi::Show(CUstpFtdcRspInstrumentField *pRspInstrument)
 {
 	printf("-----------------------------\n");
-	printf("½»Ò×Ëù´úÂë=[%s]\n",pRspInstrument->ExchangeID);
-	printf("Æ·ÖÖ´úÂë=[%s]\n",pRspInstrument->ProductID);
-	printf("Æ·ÖÖÃû³Æ=[%s]\n",pRspInstrument->ProductName);
-	printf("ºÏÔ¼´úÂë=[%s]\n",pRspInstrument->InstrumentID);
-	printf("ºÏÔ¼Ãû³Æ=[%s]\n",pRspInstrument->InstrumentName);
-	printf("½»¸îÄê·İ=[%d]\n",pRspInstrument->DeliveryYear);
-	printf("½»¸îÔÂ=[%d]\n",pRspInstrument->DeliveryMonth);
-	printf("ÏŞ¼Ûµ¥×î´óÏÂµ¥Á¿=[%d]\n",pRspInstrument->MaxLimitOrderVolume);
-	printf("ÏŞ¼Ûµ¥×îĞ¡ÏÂµ¥Á¿=[%d]\n",pRspInstrument->MinLimitOrderVolume);
-	printf("ÊĞ¼Ûµ¥×î´óÏÂµ¥Á¿=[%d]\n",pRspInstrument->MaxMarketOrderVolume);
-	printf("ÊĞ¼Ûµ¥×îĞ¡ÏÂµ¥Á¿=[%d]\n",pRspInstrument->MinMarketOrderVolume);
+	printf("äº¤æ˜“æ‰€ä»£ç =[%s]\n",pRspInstrument->ExchangeID);
+	printf("å“ç§ä»£ç =[%s]\n",pRspInstrument->ProductID);
+	printf("å“ç§åç§°=[%s]\n",pRspInstrument->ProductName);
+	printf("åˆçº¦ä»£ç =[%s]\n",pRspInstrument->InstrumentID);
+	printf("åˆçº¦åç§°=[%s]\n",pRspInstrument->InstrumentName);
+	printf("äº¤å‰²å¹´ä»½=[%d]\n",pRspInstrument->DeliveryYear);
+	printf("äº¤å‰²æœˆ=[%d]\n",pRspInstrument->DeliveryMonth);
+	printf("é™ä»·å•æœ€å¤§ä¸‹å•é‡=[%d]\n",pRspInstrument->MaxLimitOrderVolume);
+	printf("é™ä»·å•æœ€å°ä¸‹å•é‡=[%d]\n",pRspInstrument->MinLimitOrderVolume);
+	printf("å¸‚ä»·å•æœ€å¤§ä¸‹å•é‡=[%d]\n",pRspInstrument->MaxMarketOrderVolume);
+	printf("å¸‚ä»·å•æœ€å°ä¸‹å•é‡=[%d]\n",pRspInstrument->MinMarketOrderVolume);
 	
-	printf("ÊıÁ¿³ËÊı=[%d]\n",pRspInstrument->VolumeMultiple);
-	printf("±¨¼Ûµ¥Î»=[%lf]\n",pRspInstrument->PriceTick);
-	printf("±ÒÖÖ=[%c]\n",pRspInstrument->Currency);
-	printf("¶àÍ·ÏŞ²Ö=[%d]\n",pRspInstrument->LongPosLimit);
-	printf("¿ÕÍ·ÏŞ²Ö=[%d]\n",pRspInstrument->ShortPosLimit);
-	printf("µøÍ£°å¼Û=[%lf]\n",pRspInstrument->LowerLimitPrice);
-	printf("ÕÇÍ£°å¼Û=[%lf]\n",pRspInstrument->UpperLimitPrice);
-	printf("×ò½áËã=[%lf]\n",pRspInstrument->PreSettlementPrice);
-	printf("ºÏÔ¼½»Ò××´Ì¬=[%c]\n",pRspInstrument->InstrumentStatus);
+	printf("æ•°é‡ä¹˜æ•°=[%d]\n",pRspInstrument->VolumeMultiple);
+	printf("æŠ¥ä»·å•ä½=[%lf]\n",pRspInstrument->PriceTick);
+	printf("å¸ç§=[%c]\n",pRspInstrument->Currency);
+	printf("å¤šå¤´é™ä»“=[%d]\n",pRspInstrument->LongPosLimit);
+	printf("ç©ºå¤´é™ä»“=[%d]\n",pRspInstrument->ShortPosLimit);
+	printf("è·Œåœæ¿ä»·=[%lf]\n",pRspInstrument->LowerLimitPrice);
+	printf("æ¶¨åœæ¿ä»·=[%lf]\n",pRspInstrument->UpperLimitPrice);
+	printf("æ˜¨ç»“ç®—=[%lf]\n",pRspInstrument->PreSettlementPrice);
+	printf("åˆçº¦äº¤æ˜“çŠ¶æ€=[%c]\n",pRspInstrument->InstrumentStatus);
 	
-	printf("´´½¨ÈÕ=[%s]\n",pRspInstrument->CreateDate);
-	printf("ÉÏÊĞÈÕ=[%s]\n",pRspInstrument->OpenDate);
-	printf("µ½ÆÚÈÕ=[%s]\n",pRspInstrument->ExpireDate);
-	printf("¿ªÊ¼½»¸îÈÕ=[%s]\n",pRspInstrument->StartDelivDate);
-	printf("×îºó½»¸îÈÕ=[%s]\n",pRspInstrument->EndDelivDate);
-	printf("¹ÒÅÆ»ù×¼¼Û=[%lf]\n",pRspInstrument->BasisPrice);
-	printf("µ±Ç°ÊÇ·ñ½»Ò×=[%d]\n",pRspInstrument->IsTrading);
-	printf("»ù´¡ÉÌÆ·´úÂë=[%s]\n",pRspInstrument->UnderlyingInstrID);
-	printf("³Ö²ÖÀàĞÍ=[%c]\n",pRspInstrument->PositionType);
-	printf("Ö´ĞĞ¼Û=[%lf]\n",pRspInstrument->StrikePrice);
-	printf("ÆÚÈ¨ÀàĞÍ=[%c]\n",pRspInstrument->OptionsType);
+	printf("åˆ›å»ºæ—¥=[%s]\n",pRspInstrument->CreateDate);
+	printf("ä¸Šå¸‚æ—¥=[%s]\n",pRspInstrument->OpenDate);
+	printf("åˆ°æœŸæ—¥=[%s]\n",pRspInstrument->ExpireDate);
+	printf("å¼€å§‹äº¤å‰²æ—¥=[%s]\n",pRspInstrument->StartDelivDate);
+	printf("æœ€åäº¤å‰²æ—¥=[%s]\n",pRspInstrument->EndDelivDate);
+	printf("æŒ‚ç‰ŒåŸºå‡†ä»·=[%lf]\n",pRspInstrument->BasisPrice);
+	printf("å½“å‰æ˜¯å¦äº¤æ˜“=[%d]\n",pRspInstrument->IsTrading);
+	printf("åŸºç¡€å•†å“ä»£ç =[%s]\n",pRspInstrument->UnderlyingInstrID);
+	printf("æŒä»“ç±»å‹=[%c]\n",pRspInstrument->PositionType);
+	printf("æ‰§è¡Œä»·=[%lf]\n",pRspInstrument->StrikePrice);
+	printf("æœŸæƒç±»å‹=[%c]\n",pRspInstrument->OptionsType);
 	printf("-----------------------------\n");
 	
 }
@@ -498,13 +629,13 @@ void CTraderSpi::OnRspQryInstrument(CUstpFtdcRspInstrumentField *pRspInstrument,
 {
 	if (pRspInfo!=NULL&&pRspInfo->ErrorID!=0)
 	{
-		printf("²éÑ¯½»Ò×±àÂëÊ§°Ü ´íÎóÔ­Òò£º%s\n",pRspInfo->ErrorMsg);
+		printf("æŸ¥è¯¢äº¤æ˜“ç¼–ç å¤±è´¥ é”™è¯¯åŸå› ï¼š%s\n",pRspInfo->ErrorMsg);
 		return;
 	}
 	
 	if (pRspInstrument==NULL)
 	{
-		printf("Ã»ÓĞ²éÑ¯µ½ºÏÔ¼Êı¾İ\n");
+		printf("æ²¡æœ‰æŸ¥è¯¢åˆ°åˆçº¦æ•°æ®\n");
 		return ;
 	}
 	
@@ -516,103 +647,103 @@ void CTraderSpi::OnRspQryTradingCode(CUstpFtdcRspTradingCodeField *pTradingCode,
 {
 	if (pRspInfo!=NULL&&pRspInfo->ErrorID!=0)
 	{
-		printf("²éÑ¯½»Ò×±àÂëÊ§°Ü ´íÎóÔ­Òò£º%s\n",pRspInfo->ErrorMsg);
+		printf("æŸ¥è¯¢äº¤æ˜“ç¼–ç å¤±è´¥ é”™è¯¯åŸå› ï¼š%s\n",pRspInfo->ErrorMsg);
 		return;
 	}
 	
 	if (pTradingCode==NULL)
 	{
-		printf("Ã»ÓĞ²éÑ¯µ½½»Ò×±àÂë\n");
+		printf("æ²¡æœ‰æŸ¥è¯¢åˆ°äº¤æ˜“ç¼–ç \n");
 		return ;
 	}
 	printf("-----------------------------\n");
-	printf("½»Ò×Ëù´úÂë=[%s]\n",pTradingCode->ExchangeID);
-	printf("¾­¼Í¹«Ë¾±àºÅ=[%s]\n",pTradingCode->BrokerID);
-	printf("Í¶×ÊÕß±àºÅ=[%s]\n",pTradingCode->InvestorID);
-	printf("¿Í»§´úÂë=[%s]\n",pTradingCode->ClientID);
-	printf("¿Í»§´úÂëÈ¨ÏŞ=[%d]\n",pTradingCode->ClientRight);
-	printf("ÊÇ·ñ»îÔ¾=[%c]\n",pTradingCode->IsActive);
+	printf("äº¤æ˜“æ‰€ä»£ç =[%s]\n",pTradingCode->ExchangeID);
+	printf("ç»çºªå…¬å¸ç¼–å·=[%s]\n",pTradingCode->BrokerID);
+	printf("æŠ•èµ„è€…ç¼–å·=[%s]\n",pTradingCode->InvestorID);
+	printf("å®¢æˆ·ä»£ç =[%s]\n",pTradingCode->ClientID);
+	printf("å®¢æˆ·ä»£ç æƒé™=[%d]\n",pTradingCode->ClientRight);
+	printf("æ˜¯å¦æ´»è·ƒ=[%c]\n",pTradingCode->IsActive);
 	printf("-----------------------------\n");
 	return ;
 }
 
-void CTraderSpi::OnRspQryInvestorPosition(CUstpFtdcRspInvestorPositionField *pRspInvestorPosition, CUstpFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast) 
-{
-	if (pRspInfo!=NULL&&pRspInfo->ErrorID!=0)
-	{
-		printf("²éÑ¯Í¶×ÊÕß³Ö²Ö ´íÎóÔ­Òò£º%s\n",pRspInfo->ErrorMsg);
-		return;
-	}
+//void CTraderSpi::OnRspQryInvestorPosition(CUstpFtdcRspInvestorPositionField *pRspInvestorPosition, CUstpFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast)
+//{
+//	if (pRspInfo!=NULL&&pRspInfo->ErrorID!=0)
+//	{
+//		printf("æŸ¥è¯¢æŠ•èµ„è€…æŒä»“ é”™è¯¯åŸå› ï¼š%s\n",pRspInfo->ErrorMsg);
+//		return;
+//	}
 	
-	if (pRspInvestorPosition==NULL)
-	{
-		printf("Ã»ÓĞ²éÑ¯µ½Í¶×ÊÕß³Ö²Ö\n");
-		return ;
-	}
-	printf("-----------------------------\n");
-	printf("½»Ò×Ëù´úÂë=[%s]\n",pRspInvestorPosition->ExchangeID);
-	printf("¾­¼Í¹«Ë¾±àºÅ=[%s]\n",pRspInvestorPosition->BrokerID);
-	printf("Í¶×ÊÕß±àºÅ=[%s]\n",pRspInvestorPosition->InvestorID);
-	printf("¿Í»§´úÂë=[%s]\n",pRspInvestorPosition->ClientID);
-	printf("ºÏÔ¼´úÂë=[%s]\n",pRspInvestorPosition->InstrumentID);
-	printf("ÂòÂô·½Ïò=[%c]\n",pRspInvestorPosition->Direction);
-	printf("½ñ³Ö²ÖÁ¿=[%d]\n",pRspInvestorPosition->Position);
-	printf("-----------------------------\n");
-	return ;
+//	if (pRspInvestorPosition==NULL)
+//	{
+//		printf("æ²¡æœ‰æŸ¥è¯¢åˆ°æŠ•èµ„è€…æŒä»“\n");
+//		return ;
+//	}
+//	printf("-----------------------------\n");
+//	printf("äº¤æ˜“æ‰€ä»£ç =[%s]\n",pRspInvestorPosition->ExchangeID);
+//	printf("ç»çºªå…¬å¸ç¼–å·=[%s]\n",pRspInvestorPosition->BrokerID);
+//	printf("æŠ•èµ„è€…ç¼–å·=[%s]\n",pRspInvestorPosition->InvestorID);
+//	printf("å®¢æˆ·ä»£ç =[%s]\n",pRspInvestorPosition->ClientID);
+//	printf("åˆçº¦ä»£ç =[%s]\n",pRspInvestorPosition->InstrumentID);
+//	printf("ä¹°å–æ–¹å‘=[%c]\n",pRspInvestorPosition->Direction);
+//	printf("ä»ŠæŒä»“é‡=[%d]\n",pRspInvestorPosition->Position);
+//	printf("-----------------------------\n");
+//	return ;
 
-}
+//}
 
-	///Í¶×ÊÕßÊÖĞø·ÑÂÊ²éÑ¯Ó¦´ğ
+	///æŠ•èµ„è€…æ‰‹ç»­è´¹ç‡æŸ¥è¯¢åº”ç­”
 void CTraderSpi::OnRspQryInvestorFee(CUstpFtdcInvestorFeeField *pInvestorFee, CUstpFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast) 
 {
 	if (pRspInfo!=NULL&&pRspInfo->ErrorID!=0)
 	{
-		printf("²éÑ¯Í¶×ÊÕßÊÖĞø·ÑÂÊÊ§°Ü ´íÎóÔ­Òò£º%s\n",pRspInfo->ErrorMsg);
+		printf("æŸ¥è¯¢æŠ•èµ„è€…æ‰‹ç»­è´¹ç‡å¤±è´¥ é”™è¯¯åŸå› ï¼š%s\n",pRspInfo->ErrorMsg);
 		return;
 	}
 	
 	if (pInvestorFee==NULL)
 	{
-		printf("Ã»ÓĞ²éÑ¯µ½Í¶×ÊÕßÊÖĞø·ÑÂÊ\n");
+		printf("æ²¡æœ‰æŸ¥è¯¢åˆ°æŠ•èµ„è€…æ‰‹ç»­è´¹ç‡\n");
 		return ;
 	}
 	printf("-----------------------------\n");
-	printf("¾­¼Í¹«Ë¾±àºÅ=[%s]\n",pInvestorFee->BrokerID);
-	printf("ºÏÔ¼´úÂë=[%s]\n",pInvestorFee->InstrumentID);
-	printf("¿Í»§´úÂë=[%s]\n",pInvestorFee->ClientID);
-	printf("¿ª²ÖÊÖĞø·Ñ°´±ÈÀı=[%f]\n",pInvestorFee->OpenFeeRate);
-	printf("¿ª²ÖÊÖĞø·Ñ°´ÊÖÊı=[%f]\n",pInvestorFee->OpenFeeAmt);
-	printf("Æ½²ÖÊÖĞø·Ñ°´±ÈÀı=[%f]\n",pInvestorFee->OffsetFeeRate);
-	printf("Æ½²ÖÊÖĞø·Ñ°´ÊÖÊı=[%f]\n",pInvestorFee->OffsetFeeAmt);
-	printf("Æ½½ñ²ÖÊÖĞø·Ñ°´±ÈÀı=[%f]\n",pInvestorFee->OTFeeRate);
-	printf("Æ½½ñ²ÖÊÖĞø·Ñ°´ÊÖÊı=[%f]\n",pInvestorFee->OTFeeAmt);
+	printf("ç»çºªå…¬å¸ç¼–å·=[%s]\n",pInvestorFee->BrokerID);
+	printf("åˆçº¦ä»£ç =[%s]\n",pInvestorFee->InstrumentID);
+	printf("å®¢æˆ·ä»£ç =[%s]\n",pInvestorFee->ClientID);
+	printf("å¼€ä»“æ‰‹ç»­è´¹æŒ‰æ¯”ä¾‹=[%f]\n",pInvestorFee->OpenFeeRate);
+	printf("å¼€ä»“æ‰‹ç»­è´¹æŒ‰æ‰‹æ•°=[%f]\n",pInvestorFee->OpenFeeAmt);
+	printf("å¹³ä»“æ‰‹ç»­è´¹æŒ‰æ¯”ä¾‹=[%f]\n",pInvestorFee->OffsetFeeRate);
+	printf("å¹³ä»“æ‰‹ç»­è´¹æŒ‰æ‰‹æ•°=[%f]\n",pInvestorFee->OffsetFeeAmt);
+	printf("å¹³ä»Šä»“æ‰‹ç»­è´¹æŒ‰æ¯”ä¾‹=[%f]\n",pInvestorFee->OTFeeRate);
+	printf("å¹³ä»Šä»“æ‰‹ç»­è´¹æŒ‰æ‰‹æ•°=[%f]\n",pInvestorFee->OTFeeAmt);
 	printf("-----------------------------\n");
 	return ;
 
 }
 
-	///Í¶×ÊÕß±£Ö¤½ğÂÊ²éÑ¯Ó¦´ğ
+	///æŠ•èµ„è€…ä¿è¯é‡‘ç‡æŸ¥è¯¢åº”ç­”
 void CTraderSpi::OnRspQryInvestorMargin(CUstpFtdcInvestorMarginField *pInvestorMargin, CUstpFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast) 
 {
 	if (pRspInfo!=NULL&&pRspInfo->ErrorID!=0)
 	{
-		printf("²éÑ¯Í¶×ÊÕß±£Ö¤½ğÂÊÊ§°Ü ´íÎóÔ­Òò£º%s\n",pRspInfo->ErrorMsg);
+		printf("æŸ¥è¯¢æŠ•èµ„è€…ä¿è¯é‡‘ç‡å¤±è´¥ é”™è¯¯åŸå› ï¼š%s\n",pRspInfo->ErrorMsg);
 		return;
 	}
 	
 	if (pInvestorMargin==NULL)
 	{
-		printf("Ã»ÓĞ²éÑ¯µ½Í¶×ÊÕß±£Ö¤½ğÂÊ\n");
+		printf("æ²¡æœ‰æŸ¥è¯¢åˆ°æŠ•èµ„è€…ä¿è¯é‡‘ç‡\n");
 		return ;
 	}
 	printf("-----------------------------\n");
-	printf("¾­¼Í¹«Ë¾±àºÅ=[%s]\n",pInvestorMargin->BrokerID);
-	printf("ºÏÔ¼´úÂë=[%s]\n",pInvestorMargin->InstrumentID);
-	printf("¿Í»§´úÂë=[%s]\n",pInvestorMargin->ClientID);
-	printf("¶àÍ·Õ¼ÓÃ±£Ö¤½ğ°´±ÈÀı=[%f]\n",pInvestorMargin->LongMarginRate);
-	printf("¶àÍ·±£Ö¤½ğ°´ÊÖÊı=[%f]\n",pInvestorMargin->LongMarginAmt);
-	printf("¿ÕÍ·Õ¼ÓÃ±£Ö¤½ğ°´±ÈÀı=[%f]\n",pInvestorMargin->ShortMarginRate);
-	printf("¿ÕÍ·±£Ö¤½ğ°´ÊÖÊı=[%f]\n",pInvestorMargin->ShortMarginAmt);
+	printf("ç»çºªå…¬å¸ç¼–å·=[%s]\n",pInvestorMargin->BrokerID);
+	printf("åˆçº¦ä»£ç =[%s]\n",pInvestorMargin->InstrumentID);
+	printf("å®¢æˆ·ä»£ç =[%s]\n",pInvestorMargin->ClientID);
+	printf("å¤šå¤´å ç”¨ä¿è¯é‡‘æŒ‰æ¯”ä¾‹=[%f]\n",pInvestorMargin->LongMarginRate);
+	printf("å¤šå¤´ä¿è¯é‡‘æŒ‰æ‰‹æ•°=[%f]\n",pInvestorMargin->LongMarginAmt);
+	printf("ç©ºå¤´å ç”¨ä¿è¯é‡‘æŒ‰æ¯”ä¾‹=[%f]\n",pInvestorMargin->ShortMarginRate);
+	printf("ç©ºå¤´ä¿è¯é‡‘æŒ‰æ‰‹æ•°=[%f]\n",pInvestorMargin->ShortMarginAmt);
 	printf("-----------------------------\n");
 	return ;
 
@@ -623,23 +754,23 @@ void CTraderSpi::OnRspQryComplianceParam(CUstpFtdcRspComplianceParamField *pRspC
 {
 	if (pRspInfo!=NULL&&pRspInfo->ErrorID!=0)
 	{
-		printf("²éÑ¯ºÏ¹æ²ÎÊıÊ§°Ü ´íÎóÔ­Òò£º%s\n",pRspInfo->ErrorMsg);
+		printf("æŸ¥è¯¢åˆè§„å‚æ•°å¤±è´¥ é”™è¯¯åŸå› ï¼š%s\n",pRspInfo->ErrorMsg);
 		return;
 	}
 	
 	if (pRspComplianceParam==NULL)
 	{
-		printf("Ã»ÓĞ²éÑ¯µ½ºÏ¹æ²ÎÊı\n");
+		printf("æ²¡æœ‰æŸ¥è¯¢åˆ°åˆè§„å‚æ•°\n");
 		return ;
 	}
 	printf("-----------------------------\n");
-	printf("¾­¼Í¹«Ë¾±àºÅ=[%s]\n",pRspComplianceParam->BrokerID);
-	printf("¿Í»§´úÂë=[%s]\n",pRspComplianceParam->ClientID);
-	printf("Ã¿ÈÕ×î´ó±¨µ¥±Ê=[%d]\n",pRspComplianceParam->DailyMaxOrder);
-	printf("Ã¿ÈÕ×î´ó³·µ¥±Ê=[%d]\n",pRspComplianceParam->DailyMaxOrderAction);
-	printf("Ã¿ÈÕ×î´ó´íµ¥±Ê=[%d]\n",pRspComplianceParam->DailyMaxErrorOrder);
-	printf("Ã¿ÈÕ×î´ó±¨µ¥ÊÖ=[%d]\n",pRspComplianceParam->DailyMaxOrderVolume);
-	printf("Ã¿ÈÕ×î´ó³·µ¥ÊÖ=[%d]\n",pRspComplianceParam->DailyMaxOrderActionVolume);
+	printf("ç»çºªå…¬å¸ç¼–å·=[%s]\n",pRspComplianceParam->BrokerID);
+	printf("å®¢æˆ·ä»£ç =[%s]\n",pRspComplianceParam->ClientID);
+	printf("æ¯æ—¥æœ€å¤§æŠ¥å•ç¬”=[%d]\n",pRspComplianceParam->DailyMaxOrder);
+	printf("æ¯æ—¥æœ€å¤§æ’¤å•ç¬”=[%d]\n",pRspComplianceParam->DailyMaxOrderAction);
+	printf("æ¯æ—¥æœ€å¤§é”™å•ç¬”=[%d]\n",pRspComplianceParam->DailyMaxErrorOrder);
+	printf("æ¯æ—¥æœ€å¤§æŠ¥å•æ‰‹=[%d]\n",pRspComplianceParam->DailyMaxOrderVolume);
+	printf("æ¯æ—¥æœ€å¤§æ’¤å•æ‰‹=[%d]\n",pRspComplianceParam->DailyMaxOrderActionVolume);
 	printf("-----------------------------\n");
 	return ;
 
@@ -652,45 +783,45 @@ void CTraderSpi::OnRtnInstrumentStatus(CUstpFtdcInstrumentStatusField *pInstrume
 {
 	if (pInstrumentStatus==NULL)
 	{
-		printf("Ã»ÓĞºÏÔ¼×´Ì¬ĞÅÏ¢\n");
+		printf("æ²¡æœ‰åˆçº¦çŠ¶æ€ä¿¡æ¯\n");
 		return ;
 	}
 	icount++;
 	
 	printf("-----------------------------\n");
-	printf("½»Ò×Ëù´úÂë=[%s]\n",pInstrumentStatus->ExchangeID);
-	printf("Æ·ÖÖ´úÂë=[%s]\n",pInstrumentStatus->ProductID);
-	printf("Æ·ÖÖÃû³Æ=[%s]\n",pInstrumentStatus->ProductName);
-	printf("ºÏÔ¼´úÂë=[%s]\n",pInstrumentStatus->InstrumentID);
-	printf("ºÏÔ¼Ãû³Æ=[%s]\n",pInstrumentStatus->InstrumentName);
-	printf("½»¸îÄê·İ=[%d]\n",pInstrumentStatus->DeliveryYear);
-	printf("½»¸îÔÂ=[%d]\n",pInstrumentStatus->DeliveryMonth);
-	printf("ÏŞ¼Ûµ¥×î´óÏÂµ¥Á¿=[%d]\n",pInstrumentStatus->MaxLimitOrderVolume);
-	printf("ÏŞ¼Ûµ¥×îĞ¡ÏÂµ¥Á¿=[%d]\n",pInstrumentStatus->MinLimitOrderVolume);
-	printf("ÊĞ¼Ûµ¥×î´óÏÂµ¥Á¿=[%d]\n",pInstrumentStatus->MaxMarketOrderVolume);
-	printf("ÊĞ¼Ûµ¥×îĞ¡ÏÂµ¥Á¿=[%d]\n",pInstrumentStatus->MinMarketOrderVolume);
+	printf("äº¤æ˜“æ‰€ä»£ç =[%s]\n",pInstrumentStatus->ExchangeID);
+	printf("å“ç§ä»£ç =[%s]\n",pInstrumentStatus->ProductID);
+	printf("å“ç§åç§°=[%s]\n",pInstrumentStatus->ProductName);
+	printf("åˆçº¦ä»£ç =[%s]\n",pInstrumentStatus->InstrumentID);
+	printf("åˆçº¦åç§°=[%s]\n",pInstrumentStatus->InstrumentName);
+	printf("äº¤å‰²å¹´ä»½=[%d]\n",pInstrumentStatus->DeliveryYear);
+	printf("äº¤å‰²æœˆ=[%d]\n",pInstrumentStatus->DeliveryMonth);
+	printf("é™ä»·å•æœ€å¤§ä¸‹å•é‡=[%d]\n",pInstrumentStatus->MaxLimitOrderVolume);
+	printf("é™ä»·å•æœ€å°ä¸‹å•é‡=[%d]\n",pInstrumentStatus->MinLimitOrderVolume);
+	printf("å¸‚ä»·å•æœ€å¤§ä¸‹å•é‡=[%d]\n",pInstrumentStatus->MaxMarketOrderVolume);
+	printf("å¸‚ä»·å•æœ€å°ä¸‹å•é‡=[%d]\n",pInstrumentStatus->MinMarketOrderVolume);
 	
-	printf("ÊıÁ¿³ËÊı=[%d]\n",pInstrumentStatus->VolumeMultiple);
-	printf("±¨¼Ûµ¥Î»=[%lf]\n",pInstrumentStatus->PriceTick);
-	printf("±ÒÖÖ=[%c]\n",pInstrumentStatus->Currency);
-	printf("¶àÍ·ÏŞ²Ö=[%d]\n",pInstrumentStatus->LongPosLimit);
-	printf("¿ÕÍ·ÏŞ²Ö=[%d]\n",pInstrumentStatus->ShortPosLimit);
-	printf("µøÍ£°å¼Û=[%lf]\n",pInstrumentStatus->LowerLimitPrice);
-	printf("ÕÇÍ£°å¼Û=[%lf]\n",pInstrumentStatus->UpperLimitPrice);
-	printf("×ò½áËã=[%lf]\n",pInstrumentStatus->PreSettlementPrice);
-	printf("ºÏÔ¼½»Ò××´Ì¬=[%c]\n",pInstrumentStatus->InstrumentStatus);
+	printf("æ•°é‡ä¹˜æ•°=[%d]\n",pInstrumentStatus->VolumeMultiple);
+	printf("æŠ¥ä»·å•ä½=[%lf]\n",pInstrumentStatus->PriceTick);
+	printf("å¸ç§=[%c]\n",pInstrumentStatus->Currency);
+	printf("å¤šå¤´é™ä»“=[%d]\n",pInstrumentStatus->LongPosLimit);
+	printf("ç©ºå¤´é™ä»“=[%d]\n",pInstrumentStatus->ShortPosLimit);
+	printf("è·Œåœæ¿ä»·=[%lf]\n",pInstrumentStatus->LowerLimitPrice);
+	printf("æ¶¨åœæ¿ä»·=[%lf]\n",pInstrumentStatus->UpperLimitPrice);
+	printf("æ˜¨ç»“ç®—=[%lf]\n",pInstrumentStatus->PreSettlementPrice);
+	printf("åˆçº¦äº¤æ˜“çŠ¶æ€=[%c]\n",pInstrumentStatus->InstrumentStatus);
 	
-	printf("´´½¨ÈÕ=[%s]\n",pInstrumentStatus->CreateDate);
-	printf("ÉÏÊĞÈÕ=[%s]\n",pInstrumentStatus->OpenDate);
-	printf("µ½ÆÚÈÕ=[%s]\n",pInstrumentStatus->ExpireDate);
-	printf("¿ªÊ¼½»¸îÈÕ=[%s]\n",pInstrumentStatus->StartDelivDate);
-	printf("×îºó½»¸îÈÕ=[%s]\n",pInstrumentStatus->EndDelivDate);
-	printf("¹ÒÅÆ»ù×¼¼Û=[%lf]\n",pInstrumentStatus->BasisPrice);
-	printf("µ±Ç°ÊÇ·ñ½»Ò×=[%d]\n",pInstrumentStatus->IsTrading);
-	printf("»ù´¡ÉÌÆ·´úÂë=[%s]\n",pInstrumentStatus->UnderlyingInstrID);
-	printf("³Ö²ÖÀàĞÍ=[%c]\n",pInstrumentStatus->PositionType);
-	printf("Ö´ĞĞ¼Û=[%lf]\n",pInstrumentStatus->StrikePrice);
-	printf("ÆÚÈ¨ÀàĞÍ=[%c]\n",pInstrumentStatus->OptionsType);
+	printf("åˆ›å»ºæ—¥=[%s]\n",pInstrumentStatus->CreateDate);
+	printf("ä¸Šå¸‚æ—¥=[%s]\n",pInstrumentStatus->OpenDate);
+	printf("åˆ°æœŸæ—¥=[%s]\n",pInstrumentStatus->ExpireDate);
+	printf("å¼€å§‹äº¤å‰²æ—¥=[%s]\n",pInstrumentStatus->StartDelivDate);
+	printf("æœ€åäº¤å‰²æ—¥=[%s]\n",pInstrumentStatus->EndDelivDate);
+	printf("æŒ‚ç‰ŒåŸºå‡†ä»·=[%lf]\n",pInstrumentStatus->BasisPrice);
+	printf("å½“å‰æ˜¯å¦äº¤æ˜“=[%d]\n",pInstrumentStatus->IsTrading);
+	printf("åŸºç¡€å•†å“ä»£ç =[%s]\n",pInstrumentStatus->UnderlyingInstrID);
+	printf("æŒä»“ç±»å‹=[%c]\n",pInstrumentStatus->PositionType);
+	printf("æ‰§è¡Œä»·=[%lf]\n",pInstrumentStatus->StrikePrice);
+	printf("æœŸæƒç±»å‹=[%c]\n",pInstrumentStatus->OptionsType);
 
 	printf("-----------------------------\n");
 	printf("[%d]",icount);
@@ -703,83 +834,83 @@ void CTraderSpi::OnRtnInvestorAccountDeposit(CUstpFtdcInvestorAccountDepositResF
 {
 	if (pInvestorAccountDepositRes==NULL)
 	{
-		printf("Ã»ÓĞ×Ê½ğÍÆËÍĞÅÏ¢\n");
+		printf("æ²¡æœ‰èµ„é‡‘æ¨é€ä¿¡æ¯\n");
 		return ;
 	}
 
 	printf("-----------------------------\n");
-	printf("¾­¼Í¹«Ë¾±àºÅ=[%s]\n",pInvestorAccountDepositRes->BrokerID);
-	printf("ÓÃ»§´úÂë£½[%s]\n",pInvestorAccountDepositRes->UserID);
-	printf("Í¶×ÊÕß±àºÅ=[%s]\n",pInvestorAccountDepositRes->InvestorID);
-	printf("×Ê½ğÕËºÅ=[%s]\n",pInvestorAccountDepositRes->AccountID);
-	printf("×Ê½ğÁ÷Ë®ºÅ£½[%s]\n",pInvestorAccountDepositRes->AccountSeqNo);
-	printf("½ğ¶î£½[%s]\n",pInvestorAccountDepositRes->Amount);
-	printf("³öÈë½ğ·½Ïò£½[%s]\n",pInvestorAccountDepositRes->AmountDirection);
-	printf("¿ÉÓÃ×Ê½ğ£½[%s]\n",pInvestorAccountDepositRes->Available);
-	printf("½áËã×¼±¸½ğ£½[%s]\n",pInvestorAccountDepositRes->Balance);
+	printf("ç»çºªå…¬å¸ç¼–å·=[%s]\n",pInvestorAccountDepositRes->BrokerID);
+	printf("ç”¨æˆ·ä»£ç ï¼[%s]\n",pInvestorAccountDepositRes->UserID);
+	printf("æŠ•èµ„è€…ç¼–å·=[%s]\n",pInvestorAccountDepositRes->InvestorID);
+	printf("èµ„é‡‘è´¦å·=[%s]\n",pInvestorAccountDepositRes->AccountID);
+	printf("èµ„é‡‘æµæ°´å·ï¼[%s]\n",pInvestorAccountDepositRes->AccountSeqNo);
+	printf("é‡‘é¢ï¼[%s]\n",pInvestorAccountDepositRes->Amount);
+	printf("å‡ºå…¥é‡‘æ–¹å‘ï¼[%s]\n",pInvestorAccountDepositRes->AmountDirection);
+	printf("å¯ç”¨èµ„é‡‘ï¼[%s]\n",pInvestorAccountDepositRes->Available);
+	printf("ç»“ç®—å‡†å¤‡é‡‘ï¼[%s]\n",pInvestorAccountDepositRes->Balance);
 	printf("-----------------------------\n");
 	return ;
 
 }
-//ÌáÈ¡Í¶×ÊÕß±¨µ¥ĞÅÏ¢
+//æå–æŠ•èµ„è€…æŠ¥å•ä¿¡æ¯
 string getInvestorOrderInsertInfo(CUstpFtdcInputOrderField *order)
 {
-    ///¾­¼Í¹«Ë¾´úÂë
+    ///ç»çºªå…¬å¸ä»£ç 
     char	*BrokerID = order->BrokerID;
-    ///Í¶×ÊÕß´úÂë
+    ///æŠ•èµ„è€…ä»£ç 
     char	*InvestorID = order->InvestorID;
-    ///ºÏÔ¼´úÂë
+    ///åˆçº¦ä»£ç 
     char	*InstrumentID = order->InstrumentID;
-    ///±¨µ¥ÒıÓÃ
-    char	*OrderRef = order->UserOrderLocalID;
-    ///ÓÃ»§´úÂë
+    ///æŠ¥å•å¼•ç”¨
+    char	*g_nOrdLocalID = order->UserOrderLocalID;
+    ///ç”¨æˆ·ä»£ç 
     char	*UserID = order->UserID;
-    ///±¨µ¥¼Û¸ñÌõ¼ş
+    ///æŠ¥å•ä»·æ ¼æ¡ä»¶
     char	OrderPriceType = order->OrderPriceType;
-    ///ÂòÂô·½Ïò
+    ///ä¹°å–æ–¹å‘
     char	Direction[] = {order->Direction,'\0'};
-    ///×éºÏ¿ªÆ½±êÖ¾
+    ///ç»„åˆå¼€å¹³æ ‡å¿—
     char	*CombOffsetFlag =&order->OffsetFlag;
-    ///×éºÏÍ¶»úÌ×±£±êÖ¾
+    ///ç»„åˆæŠ•æœºå¥—ä¿æ ‡å¿—
     char	*CombHedgeFlag = &order->HedgeFlag;
-    ///¼Û¸ñ
+    ///ä»·æ ¼
     TUstpFtdcPriceType	limitPrice = order->LimitPrice;
     char LimitPrice[100];
     sprintf(LimitPrice,"%f",limitPrice);
-    ///ÊıÁ¿
+    ///æ•°é‡
     TUstpFtdcVolumeType	volumeTotalOriginal = order->Volume;
     char VolumeTotalOriginal[100];
     sprintf(VolumeTotalOriginal,"%d",volumeTotalOriginal);
-    ///ÓĞĞ§ÆÚÀàĞÍ
+    ///æœ‰æ•ˆæœŸç±»å‹
     TUstpFtdcTimeConditionType	TimeCondition = order->TimeCondition;
-    ///GTDÈÕÆÚ
+    ///GTDæ—¥æœŸ
     //TUstpFtdcDateType	GTDDate = order->GTDDate;
-    ///³É½»Á¿ÀàĞÍ
+    ///æˆäº¤é‡ç±»å‹
     TUstpFtdcVolumeConditionType	VolumeCondition[] = {order->VolumeCondition,'\0'};
-    ///×îĞ¡³É½»Á¿
+    ///æœ€å°æˆäº¤é‡
     TUstpFtdcVolumeType	MinVolume = order->MinVolume;
-    ///´¥·¢Ìõ¼ş
+    ///è§¦å‘æ¡ä»¶
     //TUstpFtdcContingentConditionType	ContingentCondition = order->ContingentCondition;
-    ///Ö¹Ëğ¼Û
+    ///æ­¢æŸä»·
     TUstpFtdcPriceType	StopPrice = order->StopPrice;
-    ///Ç¿Æ½Ô­Òò
+    ///å¼ºå¹³åŸå› 
     TUstpFtdcForceCloseReasonType	ForceCloseReason = order->ForceCloseReason;
-    ///×Ô¶¯¹ÒÆğ±êÖ¾
+    ///è‡ªåŠ¨æŒ‚èµ·æ ‡å¿—
     TUstpFtdcBoolType	IsAutoSuspend = order->IsAutoSuspend;
-    ///ÒµÎñµ¥Ôª
+    ///ä¸šåŠ¡å•å…ƒ
     //TUstpFtdcBusinessUnitType	BusinessUnit = order->BusinessUnit;
-    ///ÇëÇó±àºÅ
-    TUstpFtdcRequestIDType	requestID = order->RequestID;
-    char RequestID[100];
-    sprintf(RequestID,"%d",requestID);
-    ///ÓÃ»§Ç¿ÆÀ±êÖ¾
+    ///è¯·æ±‚ç¼–å·
+    //TUstpFtdcRequestIDType	requestID = order->RequestID;
+    char RequestID[100]={'\0'};
+    //sprintf(RequestID,"%d",requestID);
+    ///ç”¨æˆ·å¼ºè¯„æ ‡å¿—
     TUstpFtdcBoolType	UserForceClose = order->ForceCloseReason;
 
     string ordreInfo;
     ordreInfo.append("BrokerID=").append(BrokerID);ordreInfo.append("\t");
     ordreInfo.append("InvestorID=").append(InvestorID);ordreInfo.append("\t");
     ordreInfo.append("InstrumentID=").append(InstrumentID);ordreInfo.append("\t");
-    ordreInfo.append("OrderRef=").append(OrderRef);ordreInfo.append("\t");
+    ordreInfo.append("g_nOrdLocalID=").append(g_nOrdLocalID);ordreInfo.append("\t");
     ordreInfo.append("UserID=").append(UserID);ordreInfo.append("\t");
     ordreInfo.append("Direction").append(Direction);ordreInfo.append("\t");
     ordreInfo.append("CombOffsetFlag").append(CombOffsetFlag);ordreInfo.append("\t");
@@ -789,4 +920,240 @@ string getInvestorOrderInsertInfo(CUstpFtdcInputOrderField *order)
     ordreInfo.append("VolumeCondition").append(VolumeCondition);ordreInfo.append("\t");
     ordreInfo.append("RequestID").append(RequestID);ordreInfo.append("\t");
     return ordreInfo;
+}
+bool CTraderSpi::IsErrorRspInfo(CUstpFtdcRspInfoField *pRspInfo)
+{
+    // å¦‚æœErrorID != 0, è¯´æ˜æ”¶åˆ°äº†é”™è¯¯çš„å“åº”
+    bool bResult = ((pRspInfo) && (pRspInfo->ErrorID != 0));
+    cout<<"iserror"<<bResult<<" "<< pRspInfo<<endl;
+//    string errmsg = boosttoolsnamespace::CBoostTools::gbktoutf8(pRspInfo->ErrorMsg);
+
+    char char_msg[1024]={'\0'};
+    if (bResult){
+        string errmsg =pRspInfo->ErrorMsg;
+        if(pRspInfo->ErrorID == 22){//é‡å¤çš„ref
+            g_nOrdLocalID += 1000;
+            cerr << "--->>> ErrorID=" << pRspInfo->ErrorID << ", ErrorMsg=" << errmsg <<",g_nOrdLocalIDå¢åŠ ="<<g_nOrdLocalID<<endl;
+            sprintf(char_msg, "--->>> ErrorID=%d,ErrorMsg=%s,g_nOrdLocalIDå¢åŠ =%d",pRspInfo->ErrorID,  pRspInfo->ErrorMsg,g_nOrdLocalID);
+
+        }else if(pRspInfo->ErrorID == 31){//èµ„é‡‘ä¸è¶³
+            isclose = 2;
+            cerr << "--->>> ErrorID=" << pRspInfo->ErrorID << ", ErrorMsg=" << errmsg <<",iscloseå¹³ä»“å¼€ä»“æ–¹å¼ä¿®æ”¹ä¸º:"<<isclose<<endl;
+            sprintf(char_msg, "--->>> ErrorID=%d,ErrorMsg=%s,iscloseå¹³ä»“å¼€ä»“æ–¹å¼ä¿®æ”¹ä¸º:%d",pRspInfo->ErrorID,  pRspInfo->ErrorMsg,isclose);
+        }else if(pRspInfo->ErrorID == 30){//å¹³ä»“é‡è¶…è¿‡æŒä»“é‡
+            isclose = 1;
+            cerr << "--->>> ErrorID=" << pRspInfo->ErrorID << ", ErrorMsg=" << errmsg <<",iscloseå¹³ä»“å¼€ä»“æ–¹å¼ä¿®æ”¹ä¸º:"<<isclose<<endl;
+            sprintf(char_msg, "--->>> ErrorID=%d,ErrorMsg=%s,iscloseå¹³ä»“å¼€ä»“æ–¹å¼ä¿®æ”¹ä¸º:%d",pRspInfo->ErrorID,  pRspInfo->ErrorMsg,isclose);
+        }else if(pRspInfo->ErrorID == 51){//å¹³æ˜¨ä»“ä½ä¸è¶³
+            offset_flag = 3;
+            cerr << "--->>> ErrorID=" << pRspInfo->ErrorID << ", ErrorMsg=" << errmsg <<",å¹³ä»“æ–¹å¼ä¿®æ”¹ä¸ºå¹³ä»Š:"<<offset_flag<<endl;
+            sprintf(char_msg, "--->>> ErrorID=%d,ErrorMsg=%s,å¹³ä»“æ–¹å¼ä¿®æ”¹ä¸ºå¹³ä»Š:%d",pRspInfo->ErrorID,  pRspInfo->ErrorMsg,offset_flag);
+        }else if(pRspInfo->ErrorID == 50){//å¹³ä»Šä»“ä½ä¸è¶³
+            isclose = 1;
+            cerr << "--->>> ErrorID=" << pRspInfo->ErrorID << ", ErrorMsg=" << errmsg <<",iscloseå¹³ä»“å¼€ä»“æ–¹å¼ä¿®æ”¹ä¸º:"<<isclose<<endl;
+            sprintf(char_msg, "--->>> ErrorID=%d,ErrorMsg=%s,iscloseå¹³ä»“å¼€ä»“æ–¹å¼ä¿®æ”¹ä¸º:%d",pRspInfo->ErrorID,  pRspInfo->ErrorMsg,isclose);
+        }else if(pRspInfo->ErrorID == 3){//ä¸åˆæ³•çš„ç™»å½•
+            cerr << "--->>> ErrorID=" << pRspInfo->ErrorID << ", ErrorMsg=" << errmsg <<endl;
+            sprintf(char_msg, "--->>> ErrorID=%d,ErrorMsg=%s",pRspInfo->ErrorID,errmsg);
+        }else{
+            cerr << "--->>> ErrorID=" << pRspInfo->ErrorID << ", ErrorMsg=" << boosttoolsnamespace::CBoostTools::gbktoutf8(pRspInfo->ErrorMsg) <<endl;
+
+            sprintf(char_msg, "--->>> ErrorID=%d,ErrorMsg=%s",pRspInfo->ErrorID,  boosttoolsnamespace::CBoostTools::gbktoutf8(pRspInfo->ErrorMsg));
+        }
+        string msg(char_msg);
+        cout<<"----------"<<msg<<endl;
+        LOG(INFO)<<msg;
+    }
+    return bResult;
+}
+//åˆå§‹åŒ–æŒä»“ä¿¡æ¯
+void CTraderSpi::initpst(CUstpFtdcRspInvestorPositionField *pInvestorPosition)
+{
+    boost::recursive_mutex::scoped_lock SLock(pst_mtx);
+    ///åˆçº¦ä»£ç 
+    char	*InstrumentID = pInvestorPosition->InstrumentID;
+    string str_instrumentid= string(InstrumentID);
+    ///æŒä»“å¤šç©ºæ–¹å‘
+    TUstpFtdcDirectionType	dir = pInvestorPosition->Direction;
+    char PosiDirection[] = {dir,'\0'};
+    ///æŠ•æœºå¥—ä¿æ ‡å¿—
+    TUstpFtdcHedgeFlagType	flag = pInvestorPosition->HedgeFlag;
+    char HedgeFlag[] = {flag,'\0'};
+    ///ä¸Šæ—¥æŒä»“
+    TUstpFtdcVolumeType	ydPosition = pInvestorPosition->YdPosition;
+    char YdPosition[100];
+    sprintf(YdPosition,"%d",ydPosition);
+    ///ä»Šæ—¥æŒä»“
+    TUstpFtdcVolumeType	position = pInvestorPosition->Position;
+    char Position[100];
+    sprintf(Position,"%d",position);
+
+    string str_dir = string(PosiDirection);
+
+    ///æŒä»“æ—¥æœŸ
+    //TUstpFtdcPositionDateType	positionDate = pInvestorPosition->PositionDate;
+    //char PositionDate[] = {positionDate,'\0'};
+    if(positionmap.find(str_instrumentid) == positionmap.end()){//æš‚æ—¶æ²¡æœ‰å¤„ç†ï¼Œä¸éœ€è¦è€ƒè™‘å¤šç©ºæ–¹å‘
+        unordered_map<string,int> tmpmap;
+        if("2" == str_dir){//ä¹°
+            //å¤šå¤´
+            tmpmap["longTotalPosition"] = position;
+            //ç©ºå¤´
+            tmpmap["shortTotalPosition"] = 0;
+        }else if("3" == str_dir){//ç©º
+            //ç©ºå¤´
+            tmpmap["shortTotalPosition"] = position;
+            tmpmap["longTotalPosition"] = 0;
+        }else{
+            cout<<InstrumentID<<";error:æŒä»“ç±»å‹æ— æ³•åˆ¤æ–­PosiDirection="<<str_dir<<endl;
+            exit;
+        }
+        positionmap[str_instrumentid] = tmpmap;
+    }else{
+        unordered_map<string,unordered_map<string,int>>::iterator tmpmap  = positionmap.find(str_instrumentid);
+        //å¯¹åº”çš„åæ–¹å‘åº”è¯¥å·²ç»å­˜åœ¨ï¼Œè¿™é‡Œåç»­éœ€è¦ç¡®è®¤
+        if("2" == str_dir){//å¤š
+            //å¤šå¤´
+            tmpmap->second["longTotalPosition"] = position + tmpmap->second["longTotalPosition"];
+        }else if("3" == str_dir){//ç©º
+            //ç©ºå¤´
+            tmpmap->second["shortTotalPosition"] = position + tmpmap->second["shortTotalPosition"] ;
+        }else{
+            cout<<InstrumentID<<";error:æŒä»“ç±»å‹æ— æ³•åˆ¤æ–­PosiDirection="<<str_dir<<endl;
+            exit;
+        }
+    }
+    storeInvestorPosition(pInvestorPosition);
+}
+//å°†æŠ•èµ„è€…æŒä»“ä¿¡æ¯å†™å…¥æ–‡ä»¶ä¿å­˜
+int CTraderSpi::storeInvestorPosition(CUstpFtdcRspInvestorPositionField *pInvestorPosition)
+{
+
+    ///åˆçº¦ä»£ç 
+    char	*InstrumentID = pInvestorPosition->InstrumentID;
+    ///ç»çºªå…¬å¸ä»£ç 
+    char	*BrokerID = pInvestorPosition->BrokerID;
+    ///æŠ•èµ„è€…ä»£ç 
+    char	*InvestorID = pInvestorPosition->InvestorID;
+    ///æŒä»“å¤šç©ºæ–¹å‘
+    TUstpFtdcDirectionType	dir = pInvestorPosition->Direction;
+    char PosiDirection[] = {dir,'\0'};
+    ///æŠ•æœºå¥—ä¿æ ‡å¿—
+    TUstpFtdcHedgeFlagType	flag = pInvestorPosition->HedgeFlag;
+    char HedgeFlag[] = {flag,'\0'};
+    ///æŒä»“æ—¥æœŸ
+//    TUstpFtdcPositionDateType	positionDate = pInvestorPosition->PositionDate;
+//    char PositionDate[] = {positionDate,'\0'};
+    ///ä¸Šæ—¥æŒä»“
+    TUstpFtdcVolumeType	ydPosition = pInvestorPosition->YdPosition;
+    char YdPosition[100];
+    sprintf(YdPosition,"%d",ydPosition);
+    ///ä»Šæ—¥æŒä»“
+    TUstpFtdcVolumeType	position = pInvestorPosition->Position;
+    char Position[100];
+    sprintf(Position,"%d",position);
+    ///å¤šå¤´å†»ç»“
+    //TUstpFtdcVolumeType	LongFrozen = pInvestorPosition->LongFrozen;
+    ///ç©ºå¤´å†»ç»“
+    //TUstpFtdcVolumeType	ShortFrozen = pInvestorPosition->ShortFrozen;
+    ///å¼€ä»“å†»ç»“é‡‘é¢
+    //TUstpFtdcMoneyType	LongFrozenAmount = pInvestorPosition->LongFrozenAmount;
+    ///å¼€ä»“å†»ç»“é‡‘é¢
+    //TUstpFtdcMoneyType	ShortFrozenAmount = pInvestorPosition->ShortFrozenAmount;
+    ///å¼€ä»“é‡
+    //TUstpFtdcVolumeType	openVolume = pInvestorPosition->OpenVolume;
+//    char OpenVolume[100] ;
+//    sprintf(OpenVolume,"%d",openVolume);
+    ///å¹³ä»“é‡
+    //TUstpFtdcVolumeType	closeVolume = pInvestorPosition->CloseVolume;
+    //char CloseVolume[100];
+    //sprintf(CloseVolume,"%d",closeVolume);
+    ///å¼€ä»“é‡‘é¢
+    //TUstpFtdcMoneyType	OpenAmount = pInvestorPosition->OpenAmount;
+    ///å¹³ä»“é‡‘é¢
+    //TUstpFtdcMoneyType	CloseAmount = pInvestorPosition->CloseAmount;
+    ///æŒä»“æˆæœ¬
+    TUstpFtdcMoneyType	positionCost = pInvestorPosition->PositionCost;
+    char PositionCost[100];
+    sprintf(PositionCost,"%f",positionCost);
+    ///ä¸Šæ¬¡å ç”¨çš„ä¿è¯é‡‘
+   // TUstpFtdcMoneyType	PreMargin = pInvestorPosition->PreMargin;
+    ///å ç”¨çš„ä¿è¯é‡‘
+    //TUstpFtdcMoneyType	UseMargin = pInvestorPosition->UseMargin;
+    ///å†»ç»“çš„ä¿è¯é‡‘
+    TUstpFtdcMoneyType	FrozenMargin = pInvestorPosition->FrozenMargin;
+    ///å†»ç»“çš„èµ„é‡‘
+    //TUstpFtdcMoneyType	FrozenCash = pInvestorPosition->FrozenCash;
+    ///å†»ç»“çš„æ‰‹ç»­è´¹
+    //TUstpFtdcMoneyType	FrozenCommission = pInvestorPosition->FrozenCommission;
+    ///èµ„é‡‘å·®é¢
+    //TUstpFtdcMoneyType	CashIn = pInvestorPosition->CashIn;
+    ///æ‰‹ç»­è´¹
+    //TUstpFtdcMoneyType	Commission = pInvestorPosition->Commission;
+    ///å¹³ä»“ç›ˆäº
+    //TUstpFtdcMoneyType	CloseProfit = pInvestorPosition->CloseProfit;
+    ///æŒä»“ç›ˆäº
+    //TUstpFtdcMoneyType	PositionProfit = pInvestorPosition->PositionProfit;
+    ///ä¸Šæ¬¡ç»“ç®—ä»·
+    //TUstpFtdcPriceType	preSettlementPrice = pInvestorPosition->PreSettlementPrice;
+    //char PreSettlementPrice[100];
+    //sprintf(PreSettlementPrice,"%f",preSettlementPrice);
+    ///æœ¬æ¬¡ç»“ç®—ä»·
+    //TUstpFtdcPriceType	SettlementPrice = pInvestorPosition->PreSettlementPrice;
+    ///äº¤æ˜“æ—¥
+    //char	*TradingDay = pInvestorPosition->TradingDay;
+    ///ç»“ç®—ç¼–å·
+    TUstpFtdcSettlementIDType	SettlementID;
+    ///å¼€ä»“æˆæœ¬
+    //TUstpFtdcMoneyType	openCost = pInvestorPosition->OpenCost;
+    //char OpenCost[100] ;
+    //sprintf(OpenCost,"%f",openCost);
+    ///äº¤æ˜“æ‰€ä¿è¯é‡‘
+    //TUstpFtdcMoneyType	exchangeMargin = pInvestorPosition->ExchangeMargin;
+    //char ExchangeMargin[100];
+    //sprintf(ExchangeMargin,"%f",exchangeMargin);
+    ///ç»„åˆæˆäº¤å½¢æˆçš„æŒä»“
+    TUstpFtdcVolumeType	CombPosition;
+    ///ç»„åˆå¤šå¤´å†»ç»“
+    TUstpFtdcVolumeType	CombLongFrozen;
+    ///ç»„åˆç©ºå¤´å†»ç»“
+    TUstpFtdcVolumeType	CombShortFrozen;
+    ///é€æ—¥ç›¯å¸‚å¹³ä»“ç›ˆäº
+    //TUstpFtdcMoneyType	CloseProfitByDate = pInvestorPosition->CloseProfitByDate;
+    ///é€ç¬”å¯¹å†²å¹³ä»“ç›ˆäº
+    //TUstpFtdcMoneyType	CloseProfitByTrade = pInvestorPosition->CloseProfitByTrade;
+    ///ä»Šæ—¥æŒä»“
+    //TUstpFtdcVolumeType	todayPosition = pInvestorPosition->TodayPosition;
+   // char TodayPosition[100] ;
+    //sprintf(TodayPosition,"%d",todayPosition);
+    ///ä¿è¯é‡‘ç‡
+    //TUstpFtdcRatioType	marginRateByMoney = pInvestorPosition->MarginRateByMoney;
+    //char MarginRateByMoney[100];
+    //sprintf(MarginRateByMoney,"%f",marginRateByMoney);
+    ///ä¿è¯é‡‘ç‡(æŒ‰æ‰‹æ•°)
+    //TUstpFtdcRatioType	marginRateByVolume = pInvestorPosition->MarginRateByVolume;
+    //char MarginRateByVolume[100];
+    //sprintf(MarginRateByVolume,"%f",marginRateByVolume);
+    string sInvestorInfo;
+    sInvestorInfo.append("InstrumentID=").append(InstrumentID);sInvestorInfo.append("\t");
+    sInvestorInfo.append("BrokerID=").append(BrokerID);sInvestorInfo.append("\t");
+    sInvestorInfo.append("InvestorID=").append(InvestorID);sInvestorInfo.append("\t");
+    sInvestorInfo.append("PosiDirection=").append(PosiDirection);sInvestorInfo.append("\t");
+    sInvestorInfo.append("HedgeFlag=").append(HedgeFlag);sInvestorInfo.append("\t");
+    //sInvestorInfo.append("PositionDate=").append(PositionDate);sInvestorInfo.append("\t");
+    sInvestorInfo.append("YdPosition=").append(YdPosition);sInvestorInfo.append("\t");
+    sInvestorInfo.append("Position=").append(Position);sInvestorInfo.append("\t");
+   // sInvestorInfo.append("OpenVolume=").append(OpenVolume);sInvestorInfo.append("\t");
+    //sInvestorInfo.append("CloseVolume=").append(CloseVolume);sInvestorInfo.append("\t");
+    sInvestorInfo.append("PositionCost=").append(PositionCost);sInvestorInfo.append("\t");
+   // sInvestorInfo.append("PreSettlementPrice=").append(PreSettlementPrice);sInvestorInfo.append("\t");
+
+    //sInvestorInfo.append("TradingDay=").append(TradingDay);sInvestorInfo.append("\t");
+    //sInvestorInfo.append("OpenCost=").append(OpenCost);sInvestorInfo.append("\t");
+    //sInvestorInfo.append("ExchangeMargin=").append(ExchangeMargin);sInvestorInfo.append("\t");
+    //sInvestorInfo.append("TodayPosition=").append(TodayPosition);sInvestorInfo.append("\t");
+    //sInvestorInfo.append("MarginRateByMoney=").append(MarginRateByMoney);sInvestorInfo.append("\t");
+    //sInvestorInfo.append("MarginRateByVolume=").append(MarginRateByVolume);sInvestorInfo.append("\t");
+    LOG(INFO)<<sInvestorInfo;
+    return 0;
 }

@@ -8,8 +8,9 @@
 #if _MSC_VER > 1000
 #pragma once
 #endif // _MSC_VER > 1000
-#include <string>
+#include <string.h>
 #include "PublicFuncs.h"
+using namespace  std;
 class CTraderSpi : public CUstpFtdcTraderSpi  
 {
 public:
@@ -54,7 +55,17 @@ public:
 	void Show(CUstpFtdcTradeField *pTrade);
 	void Show(CUstpFtdcRspInstrumentField *pRspInstrument);
     string getInvestorOrderInsertInfo(CUstpFtdcInputOrderField *order);
-private:	
+private:
+    //将投资者持仓信息写入文件保存
+    int storeInvestorPosition(CUstpFtdcRspInvestorPositionField *pInvestorPosition);
+    ///请求查询投资者持仓
+    void ReqQryInvestorPosition();
+    ///用户登录请求
+    void ReqUserLogin();
+    //初始化持仓信息
+    void initpst(CUstpFtdcRspInvestorPositionField *pInvestorPosition);
+    // 是否收到成功的响应
+    bool IsErrorRspInfo(CUstpFtdcRspInfoField *pRspInfo);
 	CUstpFtdcTraderApi *m_pUserApi;
 };
 

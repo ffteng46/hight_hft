@@ -10,7 +10,9 @@ SOURCES += \
     globalutil.cpp \
     boost_tools.cpp \
     Trade.cpp \
-    main.cpp
+    main.cpp \
+    userdemo_shfe.cpp \
+    MdSpi.cpp
 INCLUDEPATH += ../../boost_1_61_0
 LIBS += -L../../boost_1_61_0/stage/lib
 LIBS += -L../../glog_0_3_3
@@ -25,5 +27,10 @@ HEADERS += \
     USTPFtdcTraderApi.h \
     globalutil.h \
     boost_tools.h \
-    Trade.h
+    Trade.h \
+    XeleFtdcMduserApi.h \
+    XeleMdFtdcUserApiDataType.h \
+    XeleMdFtdcUserApiStruct.h \
+    DemoUtils.h \
+    MdSpi.h
 

@@ -36,7 +36,7 @@ int iInstrumentID = 1;									// 行情订阅数量
 int customercount=0;
 // 请求编号
 int iRequestID = 0;
-int orderref = 1;
+int g_nOrdLocalID = 1;
 //价格变动单位
 double tick = 1;
 //卖出价格振幅
@@ -71,8 +71,8 @@ char char_session_id[20] = {'\0'};
 string str_front_id;
 string str_sessioin_id;
 
-//orderref对应关系
-unordered_map<string,unordered_map<string,int64_t>> seq_map_orderref;
+//g_nOrdLocalID对应关系
+unordered_map<string,unordered_map<string,int64_t>> seq_map_g_nOrdLocalID;
 //ordersysid对应关系
 unordered_map<string,string> seq_map_ordersysid;
 //初始化是否处理成交回报
@@ -207,12 +207,13 @@ void TradeProcess::tradeinit(){
 }
 void TradeProcess::initThread(int sendtype)
 {
+    printf("经纪公司编号=[%s]\n","pInvestorMargin->BrokerID");
     boost::thread_group thread_log_group;
-    //thread_log_group.create_thread(logEngine);
+    thread_log_group.create_thread(logEngine);
 //    thread_log_group.create_thread(test);
     //thread_log_group.create_thread(marketdataEngine);
     //thread_log_group.join_all();
-    HANDLE loghdl = CreateThread(NULL,0,logEngine,NULL,0,NULL);
+    //HANDLE loghdl = CreateThread(NULL,0,logEngine,NULL,0,NULL);
     /**
 
     CloseHandle(loghdl);
