@@ -42,7 +42,9 @@ private:
     //char m_szDataString[MAX_DATA_SIZE];
 };
 void recordRunningMsg(string msg);
-
+void OnRtnSHFEMarketData(CXeleShfeHighLevelOneMarketData *pDepthMarketData);
+string getCloseMethod();
+void initPriceGap();
 // 定义64位整形
 #if defined(_WIN32) && !defined(CYGWIN)
 typedef __int64 int64_t;

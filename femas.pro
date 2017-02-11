@@ -11,14 +11,13 @@ SOURCES += \
     boost_tools.cpp \
     Trade.cpp \
     main.cpp \
-    userdemo_shfe.cpp \
-    MdSpi.cpp
+    userdemo_shfe.cpp
 INCLUDEPATH += ../../boost_1_61_0
 LIBS += -L../../boost_1_61_0/stage/lib
 LIBS += -L../../glog_0_3_3
 LIBS += -lboost_system -lboost_thread  -lpthread -lboost_chrono -lglog -lboost_locale
-LIBS += -L/home/tff/software/develop/femas -lUSTPtraderapi
-LIBS +=  -lpthread
+LIBS += -L/home/tff/software/git_res/hight_hft -lUSTPtraderapi -lXeleMdAPI64
+LIBS +=  -lpthread -lrt
 HEADERS += \
     TraderSpi.h \
     PublicFuncs.h \
@@ -31,6 +30,6 @@ HEADERS += \
     XeleFtdcMduserApi.h \
     XeleMdFtdcUserApiDataType.h \
     XeleMdFtdcUserApiStruct.h \
-    DemoUtils.h \
-    MdSpi.h
+    DemoUtils.h
+
 

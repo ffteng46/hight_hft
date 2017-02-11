@@ -18,6 +18,7 @@ unordered_map<string,unordered_map<string,int>> positionmap;
 // UserApi对象
 CUstpFtdcTraderApi* pUserApi;
 CTraderSpi* pUserSpi;
+boost::thread_group thread_log_group;
 // 配置参数
 char  MD_FRONT_ADDR[] = "tcp://116.228.171.216:61213";// 前置地址
 char  FRONT_ADDR[] = "tcp://116.228.171.216:61205";// 前置地址 新湖期货
@@ -208,7 +209,6 @@ void TradeProcess::tradeinit(){
 void TradeProcess::initThread(int sendtype)
 {
     printf("经纪公司编号=[%s]\n","pInvestorMargin->BrokerID");
-    boost::thread_group thread_log_group;
     thread_log_group.create_thread(logEngine);
 //    thread_log_group.create_thread(test);
     //thread_log_group.create_thread(marketdataEngine);

@@ -23,9 +23,9 @@ extern CThostFtdcMdApi* mduserapi;
 extern int customercount;
 // 配置参数
 extern char MD_FRONT_ADDR[];		
-extern TThostFtdcBrokerIDType	BROKER_ID;
-extern TThostFtdcInvestorIDType INVESTOR_ID;
-extern TThostFtdcPasswordType	PASSWORD;
+extern TUstpFtdcBrokerIDType	BROKER_ID;
+extern TUstpFtdcUserIDType INVESTOR_ID;
+extern TUstpFtdcPasswordType	PASSWORD;
 extern char** ppInstrumentID;
 extern int iInstrumentID;
 extern int isclose;

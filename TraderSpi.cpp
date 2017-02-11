@@ -6,7 +6,7 @@
 #include <unistd.h>
 #include <iostream>
 #include "globalutil.h"
-
+#include "XeleFtdcMduserApi.h"
 #include <fstream>
 #include <unordered_map>
 #include <string.h>
@@ -295,7 +295,8 @@ void CTraderSpi::OnRspQryInvestorPosition(CUstpFtdcRspInvestorPositionField *pRs
         if(isbeginmk == 1){
             start_process = 1;
             isrtntradeprocess = true;
-            // 初始化UserApi
+            // 初始化hangqing api
+            initMarketDataApi();
 //            mduserapi = CThostFtdcMdApi::CreateFtdcMdApi();			// 创建UserApi
 //            CThostFtdcMdSpi* pUserSpi = new CMdSpi();
 //            mduserapi->RegisterSpi(pUserSpi);						// 注册事件类

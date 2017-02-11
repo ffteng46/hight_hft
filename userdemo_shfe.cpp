@@ -9,6 +9,15 @@
 #include <cstdio>
 #include <cstdlib>
 
+#include "TraderSpi.h"
+#include <sstream>
+#include <list>
+#include <string.h>
+#include <stdlib.h>
+#include "globalutil.h"
+#include <unordered_map>
+#include <boost/chrono.hpp>
+
 using namespace std;
 
 #include <XeleFtdcMduserApi.h>
@@ -25,8 +34,11 @@ static char PASSWD[MEMB_SIZEOF(CXeleMdFtdcReqUserLoginField, Password)];
 static char FRONTADDRESS[40];
 static char MCASTADDRESS[40];
 static char NIC[9];
-
-
+extern boost::thread_group thread_log_group;
+extern CTraderSpi* pUserSpi;
+extern unordered_map<string,unordered_map<string,int>> positionmap;
+// USER_API参数
+CXeleMdApi* mduserapi;
 static void loadConfigFile(char *iniName) {
     if (iniName == NULL || iniName[0] == 0) {
     }
@@ -87,7 +99,7 @@ static void fill_userlogin(CXeleMdFtdcReqUserLoginField *req) {
 /*
  * 示例Spi
  */
-struct ExampleSpi : public CXeleMdSpi {
+struct CXeleFtdcMdApi : public CXeleMdSpi {
 public:
 
     virtual void OnFrontDisconnected(int nReason) {
@@ -102,9 +114,8 @@ public:
 
 int g_md_switch = 1;
 
-void *job_recv_market_data(void *arg) {
-    CXeleMdApi *api = (CXeleMdApi *) arg;
-    int handle = api->GetHandle();
+void *job_recv_market_data() {
+    int handle = mduserapi->GetHandle();
     CXeleShfeMarketDataUnion mdtick;
     ofstream log("RecvMarketDataTick.log");
     while (g_md_switch) {
@@ -122,7 +133,7 @@ void *job_recv_market_data(void *arg) {
     }
 }
 
-int main1() {
+int initMarketDataApi() {
     /*
      * 读取refer.ini
      */
@@ -133,8 +144,8 @@ int main1() {
     /*
      * 创建对象
      */
-    ExampleSpi spi;
-    CXeleMdApi *api = CXeleMdApi::CreateMdApi(&spi);
+    CXeleFtdcMdApi spi;
+    mduserapi = CXeleMdApi::CreateMdApi(&spi);
 
     /*
      * 准备login的结构体
@@ -145,14 +156,13 @@ int main1() {
     /*
      * 开始登录
      */
-    fprintf(stdout, "%s\n", api->GetVersion());
+    fprintf(stdout, "%s\n", mduserapi->GetVersion());
 
-    int status = api->LoginInit(FRONTADDRESS, MCASTADDRESS, NIC, &login_info);
+    int status = mduserapi->LoginInit(FRONTADDRESS, MCASTADDRESS, NIC, &login_info);
     if (status == XELEAPI_SUCCESS) {
         cout << "XELEAPI_SUCCESS" << endl;
-    }
-    else {
-        api->Release();
+    }else {
+        mduserapi->Release();
         cout << "LoginInit fail. Exit." << endl;
         return 1;
     }
@@ -160,16 +170,17 @@ int main1() {
      * 创建线程, 获取数据
      */
 
-    pthread_t md_thread;
+    //pthread_t md_thread;
     g_md_switch = 1;
-    pthread_create(&md_thread, NULL, job_recv_market_data, api);
-
-    do {
-        cout << "Input 'q' to disconnect API:";
-        getline(cin, msg);
-    } while (msg != "q");
-    g_md_switch = 0;
-    pthread_join(md_thread, NULL);
-    api->Release();
-    cerr << "API release done. Exit Demo." << endl;
+    thread_log_group.create_thread(job_recv_market_data);
+    pthread_create(&md_thread, NULL, job_recv_market_data, mduserapi);
+//    do {
+//        cout << "Input 'q' to disconnect API:";
+//        getline(cin, msg);
+//    } while (msg != "q");
+//    g_md_switch = 0;
+//    pthread_join(md_thread, NULL);
+//    mduserapi->Release();
+//    cerr << "API release done. Exit Demo." << endl;
 }
+
