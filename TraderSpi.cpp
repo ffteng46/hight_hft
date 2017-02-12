@@ -20,7 +20,8 @@ extern unordered_map<string,unordered_map<string,int>> positionmap;
 // UserApi对象
 extern CUstpFtdcTraderApi* pUserApi;
 extern FILE * g_fpRecv;
-extern char  FRONT_ADDR;// 前置地址 新湖期货
+extern char  FRONT_ADDR[];// 前置地址 新湖期货
+extern char singleInstrument[30];
 // 请求编号
 extern int iRequestID;
 extern int g_nOrdLocalID;
@@ -29,16 +30,31 @@ extern int isclose;
 extern int offset_flag;
 extern int limit_volume;
 extern bool isrtntradeprocess;
+//跌停价格
+extern double min_price;
+//涨停价格
+extern double max_price;
+//价格变动单位
+extern double tick;
 extern boost::lockfree::queue<LogMsg*> logqueue;
 extern unordered_map<string,unordered_map<string,int64_t>> seq_map_orderref;
 extern unordered_map<string,string> seq_map_ordersysid;
+//买平标志,1开仓；2平仓
+extern int longPstIsClose;
+extern int shortPstIsClose;
 //positionmap可重入锁
 boost::recursive_mutex pst_mtx;
 //orderinsertkey与ordersysid对应关系锁
 boost::recursive_mutex order_mtx;
+//longpstlimit
+extern int longpstlimit;
+//shortpstlimit
+extern int shortpstlimit;
 //记录时间
 int ret = 0;
 int start_process = 0;
+int realLongPstLimit = 0;
+int realShortPstLimit = 0;
 CTraderSpi::CTraderSpi(CUstpFtdcTraderApi *pTrader):m_pUserApi(pTrader)
 {
 
@@ -51,7 +67,7 @@ CTraderSpi::~CTraderSpi()
 
 //记录时间
 int CTraderSpi::md_orderinsert(double price,char *dir,char *offset,char * ins,int ordervolume){
-    TUstpFtdcUserOrderLocalIDType ORDER_REF;
+    TUstpFtdcUserOrderLocalIDType UserOrderLocalID;
     char InstrumentID[31];
     strcpy(InstrumentID,ins);
     char Direction[2];
@@ -66,8 +82,8 @@ int CTraderSpi::md_orderinsert(double price,char *dir,char *offset,char * ins,in
     //开仓手数
     int Volume = ordervolume;
     //报单引用编号
-    sprintf(ORDER_REF,"%d",g_nOrdLocalID);
-    cout<<"------->"<<ORDER_REF<<endl;
+    sprintf(UserOrderLocalID,"%d",g_nOrdLocalID);
+    //cout<<"------->"<<ORDER_REF<<endl;
     g_nOrdLocalID++;
     //报单结构体
     CUstpFtdcInputOrderField req;
@@ -79,7 +95,7 @@ int CTraderSpi::md_orderinsert(double price,char *dir,char *offset,char * ins,in
     CUstpFtdcTraderApi* pUserApi;
     strcpy(req.InstrumentID, InstrumentID);
     ///报单引用
-    strcpy(req.UserOrderLocalID, ORDER_REF);
+    strcpy(req.UserOrderLocalID, UserOrderLocalID);
 
     ///用户代码
     //	TUstpFtdcUserIDType	UserID;
@@ -127,13 +143,13 @@ int CTraderSpi::md_orderinsert(double price,char *dir,char *offset,char * ins,in
     //
 
     int nRequestID = ++iRequestID;
-    char char_order_index[10]={'\0'};
-    sprintf(char_order_index,"%d",nRequestID);
-    //req.RequestID = nRequestID;
+//    char char_order_index[10]={'\0'};
+//    sprintf(char_order_index,"%d",nRequestID);
+//    //req.RequestID = nRequestID;
 
-    nRequestID = ++iRequestID;
-    char char_query_index[10]={'\0'};
-    sprintf(char_query_index,"%d",nRequestID);
+//    nRequestID = ++iRequestID;
+//    char char_query_index[10]={'\0'};
+//    sprintf(char_query_index,"%d",nRequestID);
 
     //下单开始时间
 //    int64_t ist_time = GetSysTimeMicros();
@@ -145,25 +161,24 @@ int CTraderSpi::md_orderinsert(double price,char *dir,char *offset,char * ins,in
     //委托类操作，使用客户端定义的请求编号格式
     int iResult = pUserApi->ReqOrderInsert(&req,nRequestID);
     cerr << "--->>> ReqOrderInsert:" << ((iResult == 0) ? "success" : "failed") << endl;
-    string msg = "order_requestid=" + string(char_order_index) + ";orderinsert_requestid=" + string(char_query_index);
-    //LogMsg lmsg;
-    //lmsg.setMsg(msg);;
-    //logqueue.push(&lmsg);
-    LOG(INFO) << msg;
+//    string msg = "order_requestid=" + string(char_order_index) + ";orderinsert_requestid=" + string(char_query_index);
+//    //LogMsg lmsg;
+//    //lmsg.setMsg(msg);;
+//    //logqueue.push(&lmsg);
+//    LOG(INFO) << msg;
     return 0;
 }
 void CTraderSpi::OnFrontConnected()
 {
     cerr << "--->>> " << "OnFrontConnected" << endl;
+    cout<<"交易前置="<<FRONT_ADDR<<endl;
+
     ///用户登录请求;
     ReqUserLogin();
 
 }
 void CTraderSpi::ReqUserLogin()
 {
-
-
-
     cout<<PASSWORD<<":"<<BROKER_ID<<" "<<INVESTOR_ID<<" "<<PASSWORD<<endl;
     char char_msg[1024];
     sprintf(char_msg, "发送用户登录请求:BROKER_ID:%s;INVESTOR_ID:%s;PASSWORD:%s",BROKER_ID, INVESTOR_ID,PASSWORD);
@@ -179,19 +194,12 @@ void CTraderSpi::ReqUserLogin()
     strcpy(reqUserLogin.Password, PASSWORD);
     strcpy(reqUserLogin.UserProductInfo,"");
     int iResult = m_pUserApi->ReqUserLogin(&reqUserLogin, ++iRequestID);
-//    m_pUserApi->ReqUserLogin(&reqUserLogin, g_nOrdLocalID);
-//    CThostFtdcReqUserLoginField req;
-//    //memset(&req, 0, sizeof(req));
-//    strcpy(req.BrokerID, BROKER_ID);
-//    strcpy(req.UserID, INVESTOR_ID);
-//    strcpy(req.Password, PASSWORD);
-//    int iResult = pUserApi->ReqUserLogin(&req, ++iRequestID);
     printf("请求登录，BrokerID=[%s]UserID=[%s]\n",BROKER_ID,INVESTOR_ID);
     cerr << "--->>> 发送用户登录请求: " << ((iResult == 0) ? "成功" : "失败") << endl;
 #ifdef WIN32
-    Sleep(1000);
+    Sleep(100);
 #else
-    usleep(1000);
+    usleep(100);
 #endif
 
 }
@@ -237,8 +245,10 @@ void CTraderSpi::OnRspUserLogin(CUstpFtdcRspUserLoginField *pRspUserLogin, CUstp
         LOG(INFO)<<msg;
         //ReqQryInvestorPosition();
         ///投资者结算结果确认;
+        /// extern char singleInstrument[30];
+        ReqQryInstrument(singleInstrument);
         cout<<msg<<endl;
-        ReqQryInvestorPosition();
+
     }else{
         printf("-----------------------------\n");
         printf("登录失败...错误原因：%s\n",pRspInfo->ErrorMsg);
@@ -297,8 +307,8 @@ void CTraderSpi::OnRspQryInvestorPosition(CUstpFtdcRspInvestorPositionField *pRs
             isrtntradeprocess = true;
             // 初始化hangqing api
             initMarketDataApi();
-//            mduserapi = CThostFtdcMdApi::CreateFtdcMdApi();			// 创建UserApi
-//            CThostFtdcMdSpi* pUserSpi = new CMdSpi();
+//            mduserapi = CUstpFtdcMdApi::CreateFtdcMdApi();			// 创建UserApi
+//            CUstpFtdcMdSpi* pUserSpi = new CMdSpi();
 //            mduserapi->RegisterSpi(pUserSpi);						// 注册事件类
 //            mduserapi->RegisterFront(MD_FRONT_ADDR);					// connect
 //            mduserapi->Init();
@@ -307,35 +317,146 @@ void CTraderSpi::OnRspQryInvestorPosition(CUstpFtdcRspInvestorPositionField *pRs
 }
 void CTraderSpi::OnRspOrderInsert(CUstpFtdcInputOrderField *pInputOrder, CUstpFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast)
 {
-	if (pRspInfo!=NULL&&pRspInfo->ErrorID!=0)
-	{
-		printf("-----------------------------\n");
-        printf("order insert failed! the reason is：%s\n",pRspInfo->ErrorMsg);
-		printf("-----------------------------\n");
-		return;
-	}
-	if(pInputOrder==NULL)
-	{
-        printf("no order info!\n");
-		return;
-	}
-	printf("-----------------------------\n");
-    printf("order insert success!!\n");
-	printf("-----------------------------\n");
-	return ;
+    if (pRspInfo != NULL && IsErrorRspInfo(pRspInfo))
+    {
+        //cerr << "--->>> " << "OnRspOrderInsert" << "响应请求编号："<<nRequestID<< " CTP回报请求编号"<<pInputOrder->RequestID<<endl;
+        string sInputOrderInfo = getInvestorOrderInsertInfo(pInputOrder);
+        string sResult;
+        char cErrorID[10]={'\0'};
+        sprintf(cErrorID,"%d",pRspInfo->ErrorID);
+        char cRequestid[100];
+        sprintf(cRequestid,"%d",nRequestID);
+        sResult.append("报单回报信息--->>> ErrorID=");
+        sResult.append(cErrorID);
+        sResult.append(", ErrorMsg=");
+        sResult.append(boosttoolsnamespace::CBoostTools::gbktoutf8(pRspInfo->ErrorMsg));
+        sInputOrderInfo.append(sResult);
+        sInputOrderInfo.append("响应请求编号nRequestID：");
+        sInputOrderInfo.append(cRequestid);
+        sInputOrderInfo.append( " 回报请求编号pInputOrder->UserOrderLocalID:");
+        sInputOrderInfo.append(pInputOrder->UserOrderLocalID);
+        //记录失败的对冲报单
+        LOG(INFO)<<sInputOrderInfo;
+    }
+    string ordreInfo = getInvestorOrderInsertInfo(pInputOrder);
+    LOG(INFO)<<ordreInfo;
+//	if (pRspInfo!=NULL&&pRspInfo->ErrorID!=0)
+//	{
+//		printf("-----------------------------\n");
+//        printf("order insert failed! the reason is：%s\n",pRspInfo->ErrorMsg);
+//		printf("-----------------------------\n");
+//		return;
+//	}
+//	if(pInputOrder==NULL)
+//	{
+//        printf("no order info!\n");
+//		return;
+//	}
+//	printf("-----------------------------\n");
+//    printf("order insert success!!\n");
+//	printf("-----------------------------\n");
+//	return ;
 	
 }
 
 
 void CTraderSpi::OnRtnTrade(CUstpFtdcTradeField *pTrade)
 {
-	printf("-----------------------------\n");
-    printf("received rtn trade\n");
-	Show(pTrade);
-	printf("-----------------------------\n");
-	return;
+    ret ++;
+    //cerr << "--->>> " << "OnRtnTrade"  << endl;
+    //处理持仓
+    int64_t start = GetSysTimeMicros();
+    //auto start = boost::chrono::high_resolution_clock::now();
+    char* ordersysid = pTrade->OrderSysID;
+    string str_ordersysid = boost::trim_copy(string(ordersysid));
+//    if(seq_map_ordersysid.find(str_ordersysid) != seq_map_ordersysid.end()){
+//        string tmpstr = "error:查询不到ordersysid="+str_ordersysid+" 的报单信息";
+//         LOG(INFO)<<tmpstr;
+//    }else if(isrtntradeprocess){
+        //根据ordersysid查询orderinsertkey
+//        unordered_map<string,string>::iterator tmpit = seq_map_ordersysid.find(str_ordersysid);
+//		string orderinsertkey = tmpit->second;
+//		if(orderinsertkey.size() != 0){
+//            unordered_map<string,unordered_map<string,int64_t>>::iterator tmptrade = seq_map_orderref.find(tmpit->second);
+//            unordered_map<string,int64_t> timemap = tmptrade->second;//遍历报单的相关时间差
+//            timemap["exchange_rtntrade"] = start;
+//            unordered_map<string,int64_t>::iterator mapit = timemap.begin();
+//			string str_time_msg;
+//			while(mapit!=timemap.end()){
+//				string key = mapit->first;
+////                stringstream ss;
+////                ss<<boost::chrono::duration<double>(start -mapit->second).count();
+//                char char_time[21] = {'\0'};
+//                sprintf(char_time,"%d",mapit->second);
+//                string str_time = ss.str();
+//				str_time_msg.append(key + "=" +str_time +";" );
+//				mapit ++ ;
+//			}
+//             LOG(INFO)<<str_time_msg;
+//		}
+//    }
+    processtrade(pTrade);
+    int64_t end1 = GetSysTimeMicros();
+    string tradeInfo = storeInvestorTrade(pTrade);
+    LOG(INFO)<<tradeInfo;
+    int64_t end2 = GetSysTimeMicros();
+ //   string msg = "处理成交花费:" + string(GetDiffTime(end1,start));
+ //   LOG(INFO)<<msg;
+    //recordRunningMsg(msg);
+//    recordRunningMsg(tradeInfo);
+    //msg = "记录成交花费:" + string(GetDiffTime(end2,end1));
+    //recordRunningMsg(msg);
+//    logqueue.push(&logmsg);
+//	printf("-----------------------------\n");
+//    printf("received rtn trade\n");
+//	Show(pTrade);
+//	printf("-----------------------------\n");
+//	return;
 }
+void CTraderSpi::OnHeartBeatWarning(int nTimeLapse)
+{
+    cerr << "--->>> " << "OnHeartBeatWarning" << endl;
+    cerr << "--->>> nTimerLapse = " << nTimeLapse << endl;
+}
+void CTraderSpi::OnRspError(CUstpFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast)
+{
+    cerr << "--->>> " << "OnRspError" << endl;
+    string sResult;
+    char cErrorID[100] ;
+    char cRequestid[100];
+//	itoa(pRspInfo->ErrorID,cErrorID,10);
+    sprintf(cErrorID,"%d",pRspInfo->ErrorID);
+    sprintf(cRequestid,"%d",nRequestID);
+    sResult.append("CTP错误回报--->>> ErrorID=");
+    sResult.append(cErrorID);
+    sResult.append(", ErrorMsg=");
+    sResult.append( boosttoolsnamespace::CBoostTools::gbktoutf8(pRspInfo->ErrorMsg));
+    sResult.append(",requestid=");
+    sResult.append(cRequestid);
+    //记录错误回报报单信息
+    //write(sResult,"d:\\test\\log.txt");
+    cout<<sResult<<endl;
+//    LogMsg logmsg;
+//    logmsg.setMsg(sResult);
+//    logqueue.push(&logmsg);
+    IsErrorRspInfo(pRspInfo);
+}
+void CTraderSpi::ReqQryInstrument(char *instrumentid)
+{
+//    CUstpFtdcQryInstrumentField QryInstrument;
+//    memset(&QryInstrument,0,sizeof(CUstpFtdcQryInstrumentField));
+//    //strcpy(QryInstrument.ExchangeID,"CFFEX");
+//    //strcpy(QryInstrument.InstrumentID,"IF1206");
+//    pUserApi->ReqQryInstrument(&QryInstrument,g_nOrdLocalID++);
 
+    CUstpFtdcQryInstrumentField req;
+    memset(&req, 0, sizeof(req));
+    strcpy(req.InstrumentID, instrumentid);
+    //strcpy(req.ExchangeID,"CFFEX");
+    int iResult = pUserApi->ReqQryInstrument(&req, ++g_nOrdLocalID);
+    cerr << "--->>> 请求查询合约: " << ((iResult == 0) ? "成功" : "失败") << endl;
+    ReqQryInvestorPosition();
+}
 void CTraderSpi::Show(CUstpFtdcOrderField *pOrder)
 {
 	printf("-----------------------------\n");
@@ -371,11 +492,14 @@ void CTraderSpi::Show(CUstpFtdcOrderField *pOrder)
 
 void CTraderSpi::OnRtnOrder(CUstpFtdcOrderField *pOrder)
 {
-	printf("-----------------------------\n");
-	printf("收到报单回报\n");
-	Show(pOrder);
-	printf("-----------------------------\n");
-	return ;
+    string msg = "OnRtnOrder:";
+    msg.append(getRtnOrder(pOrder));
+    LOG(INFO)<<msg;
+//	printf("-----------------------------\n");
+//	printf("收到报单回报\n");
+//	Show(pOrder);
+//	printf("-----------------------------\n");
+//	return ;
 }
 
 void CTraderSpi::OnRspOrderAction(CUstpFtdcOrderActionField *pOrderAction, CUstpFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast)
@@ -628,20 +752,23 @@ void CTraderSpi::Show(CUstpFtdcRspInstrumentField *pRspInstrument)
 }
 void CTraderSpi::OnRspQryInstrument(CUstpFtdcRspInstrumentField *pRspInstrument, CUstpFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast) 
 {
-	if (pRspInfo!=NULL&&pRspInfo->ErrorID!=0)
-	{
+	if (pRspInfo!=NULL&&pRspInfo->ErrorID!=0){
 		printf("查询交易编码失败 错误原因：%s\n",pRspInfo->ErrorMsg);
 		return;
 	}
 	
-	if (pRspInstrument==NULL)
-	{
+	if (pRspInstrument==NULL){
 		printf("没有查询到合约数据\n");
 		return ;
-	}
+    }else{
+        tick = pRspInstrument->PriceTick;
+        min_price = pRspInstrument->LowerLimitPrice;
+        max_price = pRspInstrument->UpperLimitPrice;
+        ReqQryInvestorPosition();
+    }
 	
-	Show(pRspInstrument);
-	return ;
+//	Show(pRspInstrument);
+//	return ;
 }
 
 void CTraderSpi::OnRspQryTradingCode(CUstpFtdcRspTradingCodeField *pTradingCode, CUstpFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast)
@@ -932,20 +1059,22 @@ bool CTraderSpi::IsErrorRspInfo(CUstpFtdcRspInfoField *pRspInfo)
     char char_msg[1024]={'\0'};
     if (bResult){
         string errmsg =pRspInfo->ErrorMsg;
-        if(pRspInfo->ErrorID == 22){//重复的ref
+        if(pRspInfo->ErrorID == 12){//重复的ref
             g_nOrdLocalID += 1000;
             cerr << "--->>> ErrorID=" << pRspInfo->ErrorID << ", ErrorMsg=" << errmsg <<",g_nOrdLocalID增加="<<g_nOrdLocalID<<endl;
             sprintf(char_msg, "--->>> ErrorID=%d,ErrorMsg=%s,g_nOrdLocalID增加=%d",pRspInfo->ErrorID,  pRspInfo->ErrorMsg,g_nOrdLocalID);
 
-        }else if(pRspInfo->ErrorID == 31){//资金不足
-            isclose = 2;
-            cerr << "--->>> ErrorID=" << pRspInfo->ErrorID << ", ErrorMsg=" << errmsg <<",isclose平仓开仓方式修改为:"<<isclose<<endl;
-            sprintf(char_msg, "--->>> ErrorID=%d,ErrorMsg=%s,isclose平仓开仓方式修改为:%d",pRspInfo->ErrorID,  pRspInfo->ErrorMsg,isclose);
-        }else if(pRspInfo->ErrorID == 30){//平仓量超过持仓量
-            isclose = 1;
-            cerr << "--->>> ErrorID=" << pRspInfo->ErrorID << ", ErrorMsg=" << errmsg <<",isclose平仓开仓方式修改为:"<<isclose<<endl;
-            sprintf(char_msg, "--->>> ErrorID=%d,ErrorMsg=%s,isclose平仓开仓方式修改为:%d",pRspInfo->ErrorID,  pRspInfo->ErrorMsg,isclose);
-        }else if(pRspInfo->ErrorID == 51){//平昨仓位不足
+        }else if(pRspInfo->ErrorID == 36){//资金不足
+            longPstIsClose = 2;
+            shortPstIsClose = 2;
+            cerr << "--->>> ErrorID=" << pRspInfo->ErrorID << ", ErrorMsg=" << errmsg <<",isclose平仓开仓方式修改为:"<<longPstIsClose<<endl;
+            sprintf(char_msg, "--->>> ErrorID=%d,ErrorMsg=%s,isclose平仓开仓方式修改为:%d",pRspInfo->ErrorID,  pRspInfo->ErrorMsg,longPstIsClose);
+        }else if(pRspInfo->ErrorID == 31){//平仓量超过持仓量
+            longPstIsClose = 1;
+            shortPstIsClose = 1;
+            cerr << "--->>> ErrorID=" << pRspInfo->ErrorID << ", ErrorMsg=" << errmsg <<",isclose平仓开仓方式修改为:"<<longPstIsClose<<endl;
+            sprintf(char_msg, "--->>> ErrorID=%d,ErrorMsg=%s,isclose平仓开仓方式修改为:%d",pRspInfo->ErrorID,  pRspInfo->ErrorMsg,longPstIsClose);
+        }/*else if(pRspInfo->ErrorID == 51){//平昨仓位不足
             offset_flag = 3;
             cerr << "--->>> ErrorID=" << pRspInfo->ErrorID << ", ErrorMsg=" << errmsg <<",平仓方式修改为平今:"<<offset_flag<<endl;
             sprintf(char_msg, "--->>> ErrorID=%d,ErrorMsg=%s,平仓方式修改为平今:%d",pRspInfo->ErrorID,  pRspInfo->ErrorMsg,offset_flag);
@@ -953,7 +1082,7 @@ bool CTraderSpi::IsErrorRspInfo(CUstpFtdcRspInfoField *pRspInfo)
             isclose = 1;
             cerr << "--->>> ErrorID=" << pRspInfo->ErrorID << ", ErrorMsg=" << errmsg <<",isclose平仓开仓方式修改为:"<<isclose<<endl;
             sprintf(char_msg, "--->>> ErrorID=%d,ErrorMsg=%s,isclose平仓开仓方式修改为:%d",pRspInfo->ErrorID,  pRspInfo->ErrorMsg,isclose);
-        }else if(pRspInfo->ErrorID == 3){//不合法的登录
+        }*/else if(pRspInfo->ErrorID == 60){//不合法的登录
             cerr << "--->>> ErrorID=" << pRspInfo->ErrorID << ", ErrorMsg=" << errmsg <<endl;
             sprintf(char_msg, "--->>> ErrorID=%d,ErrorMsg=%s",pRspInfo->ErrorID,errmsg);
         }else{
@@ -962,7 +1091,7 @@ bool CTraderSpi::IsErrorRspInfo(CUstpFtdcRspInfoField *pRspInfo)
             sprintf(char_msg, "--->>> ErrorID=%d,ErrorMsg=%s",pRspInfo->ErrorID,  boosttoolsnamespace::CBoostTools::gbktoutf8(pRspInfo->ErrorMsg));
         }
         string msg(char_msg);
-        cout<<"----------"<<msg<<endl;
+        //cout<<"----------"<<msg<<endl;
         LOG(INFO)<<msg;
     }
     return bResult;
@@ -996,12 +1125,12 @@ void CTraderSpi::initpst(CUstpFtdcRspInvestorPositionField *pInvestorPosition)
     //char PositionDate[] = {positionDate,'\0'};
     if(positionmap.find(str_instrumentid) == positionmap.end()){//暂时没有处理，不需要考虑多空方向
         unordered_map<string,int> tmpmap;
-        if("2" == str_dir){//买
+        if("0" == str_dir){//买
             //多头
             tmpmap["longTotalPosition"] = position;
             //空头
             tmpmap["shortTotalPosition"] = 0;
-        }else if("3" == str_dir){//空
+        }else if("1" == str_dir){//空
             //空头
             tmpmap["shortTotalPosition"] = position;
             tmpmap["longTotalPosition"] = 0;
@@ -1013,10 +1142,10 @@ void CTraderSpi::initpst(CUstpFtdcRspInvestorPositionField *pInvestorPosition)
     }else{
         unordered_map<string,unordered_map<string,int>>::iterator tmpmap  = positionmap.find(str_instrumentid);
         //对应的反方向应该已经存在，这里后续需要确认
-        if("2" == str_dir){//多
+        if("0" == str_dir){//多
             //多头
             tmpmap->second["longTotalPosition"] = position + tmpmap->second["longTotalPosition"];
-        }else if("3" == str_dir){//空
+        }else if("1" == str_dir){//空
             //空头
             tmpmap->second["shortTotalPosition"] = position + tmpmap->second["shortTotalPosition"] ;
         }else{
@@ -1026,135 +1155,519 @@ void CTraderSpi::initpst(CUstpFtdcRspInvestorPositionField *pInvestorPosition)
     }
     storeInvestorPosition(pInvestorPosition);
 }
+int CTraderSpi::processtrade(CUstpFtdcTradeField *pTrade)
+{
+    if(start_process == 0){
+        return 0;
+    }
+    ///买卖方向
+    TUstpFtdcDirectionType	direction = pTrade->Direction;
+    char Direction[]={direction,'\0'};
+    //sprintf(Direction,"%s",direction);
+    ///开平标志
+    TUstpFtdcOffsetFlagType	offsetFlag = pTrade->OffsetFlag;
+    char OffsetFlag[]={offsetFlag,'\0'};
+    ///合约代码
+    char	*InstrumentID =pTrade->InstrumentID;
+    string str_inst = string(InstrumentID);
+    //买卖方向
+    string str_dir = string(Direction);
+    //开平方向
+    string str_offset = string(OffsetFlag);
+    //锁持仓处理
+    boost::recursive_mutex::scoped_lock SLock(pst_mtx);
+    unordered_map<string,unordered_map<string,int>>::iterator map_iterator = positionmap.find(str_inst);
+    //新开仓
+    if(map_iterator == positionmap.end()){
+        unordered_map<string,int> tmpmap;
+        if(str_dir == "0"){//买
+            tmpmap["longTotalPosition"] = pTrade->TradeVolume;
+            tmpmap["shortTotalPosition"] = 0;
+        }else if(str_dir == "1"){//卖
+            tmpmap["longTotalPosition"] = 0;
+            tmpmap["shortTotalPosition"] = pTrade->TradeVolume;
+        }
+        positionmap[str_inst] = tmpmap;
+    }else{
+        if(str_dir == "0"){//买
+            if(str_offset == "0"){//买开仓,多头增加
+                int tmp_num = map_iterator->second["longTotalPosition"];
+                realLongPstLimit = tmp_num + pTrade->TradeVolume;
+                map_iterator->second["longTotalPosition"] = realLongPstLimit;
+            }else if(str_offset == "1" || str_offset == "3"||str_offset == "4"){//买平仓,空头减少
+                int tmp_num = map_iterator->second["shortTotalPosition"];
+                realShortPstLimit = tmp_num - pTrade->TradeVolume;
+                map_iterator->second["shortTotalPosition"] = realShortPstLimit;
+            }
+        }else if(str_dir == "1"){//卖
+            if(str_offset == "0"){//卖开仓,空头增加
+                int tmp_num = map_iterator->second["shortTotalPosition"];
+                realShortPstLimit = tmp_num + pTrade->TradeVolume;
+                map_iterator->second["shortTotalPosition"] = realShortPstLimit;
+            }else if(str_offset == "1" || str_offset == "3"||str_offset == "4"){//卖平仓,多头减少
+                int tmp_num = map_iterator->second["longTotalPosition"];
+                realLongPstLimit = tmp_num - pTrade->TradeVolume;
+                map_iterator->second["longTotalPosition"] = realLongPstLimit;
+            }
+        }
+        if(realLongPstLimit > longpstlimit){ //多头超过持仓限额，且必须空头有持仓才能多头平仓
+            char char_limit[10] = {'\0'};
+            sprintf(char_limit,"%d",realLongPstLimit);
+            if(realShortPstLimit == 0){
+                longPstIsClose = 1;
+                string tmpmsg= "多头持仓量=";
+                tmpmsg.append(char_limit).append("大于longpstlimit,but realShortPstLimit is zero,仍然为多头开仓");
+                LOG(INFO)<<tmpmsg;
+            }else{
+                longPstIsClose = 2;
+                string tmpmsg= "多头持仓量=";
+                tmpmsg.append(char_limit).append("大于longpstlimit,and realShortPstLimit is not zero,修改为多头平仓");
+                LOG(INFO)<<tmpmsg;
+            }
+        }else if(realShortPstLimit > shortpstlimit){//空头开平仓判断
+            char char_limit[10] = {'\0'};
+            sprintf(char_limit,"%d",realShortPstLimit);
+            if(realLongPstLimit == 0){
+                shortPstIsClose = 1;
+                string tmpmsg= "空头持仓量=";
+                tmpmsg.append(char_limit).append("大于shortpstlimit,but realLongPstLimit is zero,仍然为空头开仓");
+                LOG(INFO)<<tmpmsg;
+            }else{
+                shortPstIsClose = 2;
+                string tmpmsg= "空头持仓量=";
+                tmpmsg.append(char_limit).append("大于shortpstlimit,and realLongPstLimit is not zero,修改为空头平仓");
+                LOG(INFO)<<tmpmsg;
+            }
+        }
+    }
+    string tmpmsg;
+    for(unordered_map<string,unordered_map<string,int>>::iterator it=positionmap.begin();it != positionmap.end();it ++){
+        tmpmsg.append(it->first).append("持仓情况:");
+        char char_tmp_pst[10] = {'\0'};
+        sprintf(char_tmp_pst,"%d",it->second["longTotalPosition"]);
+        tmpmsg.append("多头数量=");
+        tmpmsg.append(char_tmp_pst);
+        char char_tmp_pst2[10] = {'\0'};
+        sprintf(char_tmp_pst2,"%d",it->second["shortTotalPosition"]);
+        tmpmsg.append("空头数量=");
+        tmpmsg.append(char_tmp_pst2);
+    }
+    LOG(INFO)<<tmpmsg;
+    return 0;
+}
 //将投资者持仓信息写入文件保存
 int CTraderSpi::storeInvestorPosition(CUstpFtdcRspInvestorPositionField *pInvestorPosition)
 {
-
     ///合约代码
     char	*InstrumentID = pInvestorPosition->InstrumentID;
     ///经纪公司代码
     char	*BrokerID = pInvestorPosition->BrokerID;
+    ///交易所代码
+    TUstpFtdcExchangeIDType	ExchangeID ;
+    strcpy( ExchangeID,pInvestorPosition->ExchangeID);
     ///投资者代码
     char	*InvestorID = pInvestorPosition->InvestorID;
+    ///客户代码
+    TUstpFtdcClientIDType	ClientID;
+    strcpy(ClientID,pInvestorPosition->ClientID);
     ///持仓多空方向
     TUstpFtdcDirectionType	dir = pInvestorPosition->Direction;
     char PosiDirection[] = {dir,'\0'};
     ///投机套保标志
     TUstpFtdcHedgeFlagType	flag = pInvestorPosition->HedgeFlag;
     char HedgeFlag[] = {flag,'\0'};
-    ///持仓日期
-//    TUstpFtdcPositionDateType	positionDate = pInvestorPosition->PositionDate;
-//    char PositionDate[] = {positionDate,'\0'};
-    ///上日持仓
+    ///昨持仓量
     TUstpFtdcVolumeType	ydPosition = pInvestorPosition->YdPosition;
     char YdPosition[100];
     sprintf(YdPosition,"%d",ydPosition);
+    ///昨日持仓成本
+    TUstpFtdcMoneyType	YdPositionCost = pInvestorPosition->YdPositionCost;
+    char char_ydPstCost[100];
+    sprintf(char_ydPstCost,"%f",YdPositionCost);
     ///今日持仓
     TUstpFtdcVolumeType	position = pInvestorPosition->Position;
     char Position[100];
     sprintf(Position,"%d",position);
-    ///多头冻结
-    //TUstpFtdcVolumeType	LongFrozen = pInvestorPosition->LongFrozen;
-    ///空头冻结
-    //TUstpFtdcVolumeType	ShortFrozen = pInvestorPosition->ShortFrozen;
-    ///开仓冻结金额
-    //TUstpFtdcMoneyType	LongFrozenAmount = pInvestorPosition->LongFrozenAmount;
-    ///开仓冻结金额
-    //TUstpFtdcMoneyType	ShortFrozenAmount = pInvestorPosition->ShortFrozenAmount;
-    ///开仓量
-    //TUstpFtdcVolumeType	openVolume = pInvestorPosition->OpenVolume;
-//    char OpenVolume[100] ;
-//    sprintf(OpenVolume,"%d",openVolume);
-    ///平仓量
-    //TUstpFtdcVolumeType	closeVolume = pInvestorPosition->CloseVolume;
-    //char CloseVolume[100];
-    //sprintf(CloseVolume,"%d",closeVolume);
-    ///开仓金额
-    //TUstpFtdcMoneyType	OpenAmount = pInvestorPosition->OpenAmount;
-    ///平仓金额
-    //TUstpFtdcMoneyType	CloseAmount = pInvestorPosition->CloseAmount;
-    ///持仓成本
+    ///今日持仓成本
     TUstpFtdcMoneyType	positionCost = pInvestorPosition->PositionCost;
     char PositionCost[100];
     sprintf(PositionCost,"%f",positionCost);
-    ///上次占用的保证金
-   // TUstpFtdcMoneyType	PreMargin = pInvestorPosition->PreMargin;
     ///占用的保证金
-    //TUstpFtdcMoneyType	UseMargin = pInvestorPosition->UseMargin;
+    TUstpFtdcMoneyType	UseMargin = pInvestorPosition->UsedMargin;
+    char char_useMargin[100] ;
+    sprintf(char_useMargin,"%f",UseMargin);
     ///冻结的保证金
     TUstpFtdcMoneyType	FrozenMargin = pInvestorPosition->FrozenMargin;
-    ///冻结的资金
-    //TUstpFtdcMoneyType	FrozenCash = pInvestorPosition->FrozenCash;
-    ///冻结的手续费
-    //TUstpFtdcMoneyType	FrozenCommission = pInvestorPosition->FrozenCommission;
-    ///资金差额
-    //TUstpFtdcMoneyType	CashIn = pInvestorPosition->CashIn;
-    ///手续费
-    //TUstpFtdcMoneyType	Commission = pInvestorPosition->Commission;
-    ///平仓盈亏
-    //TUstpFtdcMoneyType	CloseProfit = pInvestorPosition->CloseProfit;
-    ///持仓盈亏
-    //TUstpFtdcMoneyType	PositionProfit = pInvestorPosition->PositionProfit;
-    ///上次结算价
-    //TUstpFtdcPriceType	preSettlementPrice = pInvestorPosition->PreSettlementPrice;
-    //char PreSettlementPrice[100];
-    //sprintf(PreSettlementPrice,"%f",preSettlementPrice);
-    ///本次结算价
-    //TUstpFtdcPriceType	SettlementPrice = pInvestorPosition->PreSettlementPrice;
-    ///交易日
-    //char	*TradingDay = pInvestorPosition->TradingDay;
-    ///结算编号
-    TUstpFtdcSettlementIDType	SettlementID;
-    ///开仓成本
-    //TUstpFtdcMoneyType	openCost = pInvestorPosition->OpenCost;
-    //char OpenCost[100] ;
-    //sprintf(OpenCost,"%f",openCost);
-    ///交易所保证金
-    //TUstpFtdcMoneyType	exchangeMargin = pInvestorPosition->ExchangeMargin;
-    //char ExchangeMargin[100];
-    //sprintf(ExchangeMargin,"%f",exchangeMargin);
-    ///组合成交形成的持仓
-    TUstpFtdcVolumeType	CombPosition;
-    ///组合多头冻结
-    TUstpFtdcVolumeType	CombLongFrozen;
-    ///组合空头冻结
-    TUstpFtdcVolumeType	CombShortFrozen;
-    ///逐日盯市平仓盈亏
-    //TUstpFtdcMoneyType	CloseProfitByDate = pInvestorPosition->CloseProfitByDate;
-    ///逐笔对冲平仓盈亏
-    //TUstpFtdcMoneyType	CloseProfitByTrade = pInvestorPosition->CloseProfitByTrade;
-    ///今日持仓
-    //TUstpFtdcVolumeType	todayPosition = pInvestorPosition->TodayPosition;
-   // char TodayPosition[100] ;
-    //sprintf(TodayPosition,"%d",todayPosition);
-    ///保证金率
-    //TUstpFtdcRatioType	marginRateByMoney = pInvestorPosition->MarginRateByMoney;
-    //char MarginRateByMoney[100];
-    //sprintf(MarginRateByMoney,"%f",marginRateByMoney);
-    ///保证金率(按手数)
-    //TUstpFtdcRatioType	marginRateByVolume = pInvestorPosition->MarginRateByVolume;
-    //char MarginRateByVolume[100];
-    //sprintf(MarginRateByVolume,"%f",marginRateByVolume);
+    char char_frozenMargin[100] ;
+    sprintf(char_frozenMargin,"%f",FrozenMargin);
+    ///开仓冻结持仓
+    TUstpFtdcVolumeType	FrozenPosition = pInvestorPosition->FrozenPosition;
+    char char_FrozenPosition[100] ;
+    sprintf(char_FrozenPosition,"%d",FrozenPosition);
+    ///平仓冻结持仓
+    TUstpFtdcVolumeType	FrozenClosing = pInvestorPosition->FrozenClosing;
+    char char_FrozenClosing[100] ;
+    sprintf(char_FrozenClosing,"%d",FrozenClosing);
+    ///冻结的权利金
+    TUstpFtdcMoneyType	FrozenPremium = pInvestorPosition->FrozenPremium;
+    char char_FrozenPremium[100] ;
+    sprintf(char_FrozenPremium,"%d",FrozenPremium);
+
     string sInvestorInfo;
     sInvestorInfo.append("InstrumentID=").append(InstrumentID);sInvestorInfo.append("\t");
     sInvestorInfo.append("BrokerID=").append(BrokerID);sInvestorInfo.append("\t");
+    sInvestorInfo.append("ExchangeID=").append(ExchangeID);sInvestorInfo.append("\t");
     sInvestorInfo.append("InvestorID=").append(InvestorID);sInvestorInfo.append("\t");
+    sInvestorInfo.append("ClientID=").append(ClientID);sInvestorInfo.append("\t");
     sInvestorInfo.append("PosiDirection=").append(PosiDirection);sInvestorInfo.append("\t");
     sInvestorInfo.append("HedgeFlag=").append(HedgeFlag);sInvestorInfo.append("\t");
-    //sInvestorInfo.append("PositionDate=").append(PositionDate);sInvestorInfo.append("\t");
-    sInvestorInfo.append("YdPosition=").append(YdPosition);sInvestorInfo.append("\t");
-    sInvestorInfo.append("Position=").append(Position);sInvestorInfo.append("\t");
-   // sInvestorInfo.append("OpenVolume=").append(OpenVolume);sInvestorInfo.append("\t");
-    //sInvestorInfo.append("CloseVolume=").append(CloseVolume);sInvestorInfo.append("\t");
-    sInvestorInfo.append("PositionCost=").append(PositionCost);sInvestorInfo.append("\t");
-   // sInvestorInfo.append("PreSettlementPrice=").append(PreSettlementPrice);sInvestorInfo.append("\t");
 
-    //sInvestorInfo.append("TradingDay=").append(TradingDay);sInvestorInfo.append("\t");
-    //sInvestorInfo.append("OpenCost=").append(OpenCost);sInvestorInfo.append("\t");
-    //sInvestorInfo.append("ExchangeMargin=").append(ExchangeMargin);sInvestorInfo.append("\t");
-    //sInvestorInfo.append("TodayPosition=").append(TodayPosition);sInvestorInfo.append("\t");
-    //sInvestorInfo.append("MarginRateByMoney=").append(MarginRateByMoney);sInvestorInfo.append("\t");
-    //sInvestorInfo.append("MarginRateByVolume=").append(MarginRateByVolume);sInvestorInfo.append("\t");
+    sInvestorInfo.append("YdPosition=").append(YdPosition);sInvestorInfo.append("\t");
+    sInvestorInfo.append("YdPositionCost=").append(char_ydPstCost);sInvestorInfo.append("\t");
+    sInvestorInfo.append("Position=").append(Position);sInvestorInfo.append("\t");
+    sInvestorInfo.append("PositionCost=").append(PositionCost);sInvestorInfo.append("\t");
+    sInvestorInfo.append("UsedMargin=").append(char_useMargin);sInvestorInfo.append("\t");
+    sInvestorInfo.append("FrozenMargin=").append(char_frozenMargin);sInvestorInfo.append("\t");
+
+    sInvestorInfo.append("FrozenPosition=").append(char_FrozenPosition);sInvestorInfo.append("\t");
+    sInvestorInfo.append("FrozenClosing=").append(char_FrozenClosing);sInvestorInfo.append("\t");
+    sInvestorInfo.append("FrozenPremium=").append(char_FrozenPremium);sInvestorInfo.append("\t");
+
     LOG(INFO)<<sInvestorInfo;
     return 0;
+}
+//将投资者成交信息写入文件保存
+string CTraderSpi::storeInvestorTrade(CUstpFtdcTradeField *pTrade)
+{
+    string tradeInfo;
+    ///买卖方向
+    TUstpFtdcDirectionType	direction = pTrade->Direction;
+    char Direction[]={direction,'\0'};
+    //sprintf(Direction,"%s",direction);
+    ///开平标志
+    TUstpFtdcOffsetFlagType	offsetFlag = pTrade->OffsetFlag;
+    char OffsetFlag[]={offsetFlag,'\0'};
+    //sprintf(OffsetFlag,"%s",offsetFlag);
+    ///经纪公司代码
+    char	*BrokerID = pTrade->BrokerID;
+    ///投资者代码
+    char	*InvestorID = pTrade->InvestorID;
+    ///合约代码
+    char	*InstrumentID =pTrade->InstrumentID;
+    ///报单引用
+    //char	*UserOrderLocalID = pTrade->UserOrderLocalID;
+    ///用户代码
+    char	*UserID = pTrade->UserID;
+    ///交易所代码
+    char	*ExchangeID =pTrade->ExchangeID;
+    ///成交编号
+    char *	TradeID = pTrade->TradeID;
+
+    ///报单编号
+    char	*OrderSysID = pTrade->OrderSysID;
+    ///会员代码
+    //TUstpFtdcParticipantIDType	ParticipantID;
+    ///客户代码
+    char	*ClientID = pTrade->ClientID;
+    ///交易角色
+    //TUstpFtdcTradingRoleType	TradingRole;
+    ///合约在交易所的代码
+    //TUstpFtdcExchangeInstIDType	ExchangeInstID;
+
+    ///投机套保标志
+    TUstpFtdcHedgeFlagType	hedgeFlag = pTrade->HedgeFlag;
+    char HedgeFlag[]={hedgeFlag,'\0'};
+    //sprintf(HedgeFlag,"%s",hedgeFlag);
+    ///价格
+    TUstpFtdcPriceType	price = pTrade->TradePrice;
+    char Price[100];
+    sprintf(Price,"%f",price);
+    ///数量
+    TUstpFtdcVolumeType	volume = pTrade->TradeVolume;
+    char Volume[100];
+    sprintf(Volume,"%d",volume);
+    ///成交时期
+    //TUstpFtdcDateType	TradeDate;
+    ///成交时间
+    char	*TradeTime = pTrade->TradeTime;
+    ///成交类型
+//    TUstpFtdcTradeTypeType	tradeType = pTrade->tr;
+//    char TradeType[]={tradeType,'\0'};
+    //sprintf(TradeType,"%s",tradeType);
+    ///成交价来源
+    //TUstpFtdcPriceSourceType	PriceSource;
+    ///交易所交易员代码
+    //TUstpFtdcTraderIDType	TraderID;
+    ///本地报单编号
+    char	*OrderLocalID = pTrade->UserOrderLocalID;
+    ///结算会员编号
+    //TUstpFtdcParticipantIDType	ClearingPartID;
+    ///业务单元
+    //TUstpFtdcBusinessUnitType	BusinessUnit;
+    ///序号
+    //TUstpFtdcSequenceNoType	SequenceNo;
+    ///交易日
+    char	*TradingDay = pTrade->TradingDay;
+    ///结算编号
+    //TUstpFtdcSettlementIDType	SettlementID;
+    ///经纪公司报单编号
+    //TUstpFtdcSequenceNoType	BrokerOrderSeq;
+    tradeInfo.append("BrokerID=").append(BrokerID);tradeInfo.append("\t");
+    tradeInfo.append("InvestorID=").append(InvestorID);tradeInfo.append("\t");
+    tradeInfo.append("InstrumentID=").append(InstrumentID);tradeInfo.append("\t");
+    //tradeInfo.append("OrderRef=").append(OrderRef);tradeInfo.append("\t");
+    tradeInfo.append("UserID=").append(UserID);tradeInfo.append("\t");
+    tradeInfo.append("ExchangeID=").append(ExchangeID);tradeInfo.append("\t");
+    tradeInfo.append("Direction=").append(Direction);tradeInfo.append("\t");
+    tradeInfo.append("ClientID=").append(ClientID);tradeInfo.append("\t");
+    tradeInfo.append("OffsetFlag=").append(OffsetFlag);tradeInfo.append("\t");
+    tradeInfo.append("HedgeFlag=").append(HedgeFlag);tradeInfo.append("\t");
+    tradeInfo.append("Price=").append(Price);tradeInfo.append("\t");
+    tradeInfo.append("Volume=").append(Volume);tradeInfo.append("\t");
+    tradeInfo.append("TradeTime=").append(TradeTime);tradeInfo.append("\t");
+    //tradeInfo.append("TradeType=").append(TradeType);tradeInfo.append("\t");
+    tradeInfo.append("OrderLocalID=").append(OrderLocalID);tradeInfo.append("\t");
+    tradeInfo.append("TradingDay=").append(TradingDay);tradeInfo.append("\t");
+    tradeInfo.append("ordersysid=").append(OrderSysID);tradeInfo.append("\t");
+    tradeInfo.append("tradeid=").append(TradeID);tradeInfo.append("\t");
+    return tradeInfo;
+}
+//提取投资者报单信息
+string CTraderSpi::getInvestorOrderInsertInfo(CUstpFtdcInputOrderField *order)
+{
+    ///经纪公司代码
+    char	*BrokerID = order->BrokerID;
+    ///投资者代码
+    char	*InvestorID = order->InvestorID;
+    ///合约代码
+    char	*InstrumentID = order->InstrumentID;
+    ///报单引用
+    char	*UserOrderLocalID = order->UserOrderLocalID;
+    ///用户代码
+    char	*UserID = order->UserID;
+    ///报单价格条件
+    char	OrderPriceType = order->OrderPriceType;
+    ///买卖方向
+    char	Direction[] = {order->Direction,'\0'};
+    ///组合开平标志
+    char	*CombOffsetFlag =&order->OffsetFlag;
+    ///组合投机套保标志
+    char	*CombHedgeFlag = &order->HedgeFlag;
+    ///价格
+    TUstpFtdcPriceType	limitPrice = order->LimitPrice;
+    char LimitPrice[100];
+    sprintf(LimitPrice,"%f",limitPrice);
+    ///数量
+    TUstpFtdcVolumeType	volumeTotalOriginal = order->Volume;
+    char VolumeTotalOriginal[100];
+    sprintf(VolumeTotalOriginal,"%d",volumeTotalOriginal);
+    ///有效期类型
+    TUstpFtdcTimeConditionType	TimeCondition = order->TimeCondition;
+    ///GTD日期
+    //TUstpFtdcDateType	GTDDate = order->GTDDate;
+    ///成交量类型
+    TUstpFtdcVolumeConditionType	VolumeCondition[] = {order->VolumeCondition,'\0'};
+    ///最小成交量
+    TUstpFtdcVolumeType	MinVolume = order->MinVolume;
+    ///触发条件
+//    TUstpFtdcContingentConditionType	ContingentCondition = order->ContingentCondition;
+    ///止损价
+    TUstpFtdcPriceType	StopPrice = order->StopPrice;
+    ///强平原因
+    TUstpFtdcForceCloseReasonType	ForceCloseReason = order->ForceCloseReason;
+    ///自动挂起标志
+    TUstpFtdcBoolType	IsAutoSuspend = order->IsAutoSuspend;
+    ///业务单元
+    //TUstpFtdcBusinessUnitType	BusinessUnit = order->BusinessUnit;
+    ///请求编号
+//    TUstpFtdcRequestIDType	requestID = order->RequestID;
+//    char RequestID[100];
+//    sprintf(RequestID,"%d",requestID);
+    ///用户强评标志
+//    TUstpFtdcBoolType	UserForceClose = order->;
+
+    string ordreInfo;
+    ordreInfo.append("BrokerID=").append(BrokerID);ordreInfo.append("\t");
+    ordreInfo.append("InvestorID=").append(InvestorID);ordreInfo.append("\t");
+    ordreInfo.append("InstrumentID=").append(InstrumentID);ordreInfo.append("\t");
+    ordreInfo.append("UserOrderLocalID=").append(UserOrderLocalID);ordreInfo.append("\t");
+    ordreInfo.append("UserID=").append(UserID);ordreInfo.append("\t");
+    ordreInfo.append("Direction").append(Direction);ordreInfo.append("\t");
+    ordreInfo.append("CombOffsetFlag").append(CombOffsetFlag);ordreInfo.append("\t");
+    ordreInfo.append("CombHedgeFlag").append(CombHedgeFlag);ordreInfo.append("\t");
+    ordreInfo.append("LimitPrice").append(LimitPrice);ordreInfo.append("\t");
+    ordreInfo.append("VolumeTotalOriginal").append(VolumeTotalOriginal);ordreInfo.append("\t");
+    ordreInfo.append("VolumeCondition").append(VolumeCondition);ordreInfo.append("\t");
+//    ordreInfo.append("RequestID").append(RequestID);ordreInfo.append("\t");
+    return ordreInfo;
+}
+//获取交易所回报响应
+string CTraderSpi::getRtnOrder(CUstpFtdcOrderField *pOrder)
+{
+    ///经纪公司代码
+    char	*BrokerID = pOrder->BrokerID;
+    ///投资者代码
+    char	*InvestorID = pOrder->InvestorID;
+    ///合约代码
+    char	*InstrumentID = pOrder->InstrumentID;
+    ///报单引用
+   // char	*UserOrderLocalID = pOrder->UserOrderLocalID;
+    ///用户代码
+    TUstpFtdcUserIDType	UserID;
+    ///报单价格条件
+    TUstpFtdcOrderPriceTypeType	OrderPriceType;
+    ///买卖方向
+    TUstpFtdcDirectionType	Direction = pOrder->Direction;
+    ///组合开平标志
+    TUstpFtdcOffsetFlagType	OffsetFlag;
+    ///组合投机套保标志
+    TUstpFtdcHedgeFlagType	HedgeFlag;
+    ///价格
+    TUstpFtdcPriceType	LimitPrice;
+    ///数量
+    TUstpFtdcVolumeType	VolumeTotalOriginal;
+    ///有效期类型
+    TUstpFtdcTimeConditionType	TimeCondition;
+    ///GTD日期
+    TUstpFtdcDateType	GTDDate;
+    ///成交量类型
+    TUstpFtdcVolumeConditionType	VolumeCondition;
+    ///最小成交量
+    TUstpFtdcVolumeType	MinVolume;
+    ///触发条件
+   // TUstpFtdcContingentConditionType	ContingentCondition;
+    ///止损价
+    TUstpFtdcPriceType	StopPrice;
+    ///强平原因
+    TUstpFtdcForceCloseReasonType	ForceCloseReason;
+    ///自动挂起标志
+    TUstpFtdcBoolType	IsAutoSuspend;
+    ///业务单元
+    TUstpFtdcBusinessUnitType	BusinessUnit;
+    ///请求编号
+//    TUstpFtdcRequestIDType	RequestID = pOrder->RequestID;
+//    char cRequestId[100];
+//    sprintf(cRequestId,"%d",RequestID);
+    ///本地报单编号
+    char	*OrderLocalID = pOrder->OrderLocalID;
+    ///交易所代码
+    TUstpFtdcExchangeIDType	ExchangeID;
+    strcpy(ExchangeID,pOrder->ExchangeID);
+    ///会员代码
+    TUstpFtdcParticipantIDType	ParticipantID;
+    ///客户代码
+    char	*ClientID = pOrder->ClientID;
+    ///合约在交易所的代码
+   // TUstpFtdcExchangeInstIDType	ExchangeInstID;
+    ///交易所交易员代码
+    //TUstpFtdcTraderIDType	TraderID;
+    ///安装编号
+    //TUstpFtdcInstallIDType	InstallID;
+    ///报单提交状态
+//    char	OrderSubmitStatus = pOrder->OrderSubmitStatus;
+//    char cOrderSubmitStatus[] = {OrderSubmitStatus,'\0'};
+    //sprintf(cOrderSubmitStatus,"%s",OrderSubmitStatus);
+    ///报单状态
+    TUstpFtdcOrderStatusType	OrderStatus = pOrder->OrderStatus;
+    char cOrderStatus[] = {OrderStatus,'\0'};
+    //sprintf(cOrderStatus,"%s",OrderStatus);
+    ///报单提示序号
+    TUstpFtdcSequenceNoType	NotifySequence;
+    ///交易日
+    TUstpFtdcDateType	TradingDay;
+    strcpy(TradingDay,pOrder->TradingDay);
+    ///结算编号
+    TUstpFtdcSettlementIDType	SettlementID;
+    ///报单编号
+    char	*OrderSysID = pOrder->OrderSysID;
+    string str_ordersysid = boost::trim_copy(string(OrderSysID));
+
+    ///报单来源
+    TUstpFtdcOrderSourceType	OrderSource;
+    ///报单类型
+    //TUstpFtdcOrderTypeType	OrderType;
+    ///今成交数量
+    TUstpFtdcVolumeType	VolumeTraded = pOrder->VolumeTraded;
+    char cVolumeTraded[100];
+    sprintf(cVolumeTraded,"%d",VolumeTraded);
+    ///剩余数量
+    /*TUstpFtdcVolumeType	VolumeTotal = pOrder->VolumeTotal;
+    char iVolumeTotal[100];
+    sprintf(iVolumeTotal,"%d",VolumeTotal);*/
+    ///报单日期
+    TUstpFtdcDateType	InsertDate;
+    ///委托时间
+    TUstpFtdcTimeType	InsertTime;
+    ///激活时间
+    TUstpFtdcTimeType	ActiveTime;
+    ///挂起时间
+    TUstpFtdcTimeType	SuspendTime;
+    ///最后修改时间
+    TUstpFtdcTimeType	UpdateTime;
+    ///撤销时间
+    TUstpFtdcTimeType	CancelTime;
+    ///最后修改交易所交易员代码
+    //TUstpFtdcTraderIDType	ActiveTraderID;
+    ///结算会员编号
+    TUstpFtdcParticipantIDType	ClearingPartID;
+    ///序号
+    TUstpFtdcSequenceNoType	SequenceNo;
+    ///前置编号
+    //TUstpFtdcFrontIDType	FrontID;
+    ///会话编号
+    //TUstpFtdcSessionIDType	SessionID;
+    ///用户端产品信息
+    TUstpFtdcProductInfoType	UserProductInfo;
+    ///状态信息
+    //char	*StatusMsg = pOrder->StatusMsg;
+    ///用户强评标志
+    TUstpFtdcBoolType	UserForceClose;
+    ///操作用户代码
+    TUstpFtdcUserIDType	ActiveUserID;
+    ///经纪公司报单编号
+    TUstpFtdcSequenceNoType	BrokerOrderSeq;
+
+//    char char_ordref[21] = {'\0'};
+//    sprintf(char_ordref,"%s",pOrder->OrderRef);
+//    string str_orderk = str_front_id+str_sessioin_id+string(char_ordref);
+//    //处理报单回报
+//    boost::recursive_mutex::scoped_lock SLock(order_mtx);
+//    if(seq_map_orderref.find(str_orderk)==seq_map_orderref.end()){
+//        string tmp_msg = "error:查询不到"+str_orderk+"对应的报单信息";
+//        LOG(INFO)<<tmp_msg;
+//    }else{
+//        unordered_map<string,unordered_map<string,int64_t>>::iterator tmpit = seq_map_orderref.find(str_orderk);
+//        int64_t ist_time = tmpit->second["ist_time"];
+//        int64_t tmpendtime = GetSysTimeMicros();
+//        //auto tmpendtime = boost::chrono::high_resolution_clock::now();
+//        //没有对应关系
+//        if(strlen(OrderSysID)  != 0 && seq_map_ordersysid.find(str_ordersysid)==seq_map_ordersysid.end()){
+//            seq_map_ordersysid[str_ordersysid] = str_orderk;
+//            LOG(INFO)<<"ordersysid="+str_ordersysid;
+//        }
+//        double elapse = boost::chrono::duration<double>(tmpendtime - ist_time).count();
+//        if(strlen(OrderSysID) == 0){//CTP返回
+//            tmpit->second["ctp_rtnorder"] = tmpendtime;
+//        }else if(strcmp(cOrderStatus,"3") == 0){//未成交
+//            tmpit->second["exchange_rtnorder_untrade"] = tmpendtime;
+//        }else if(strcmp(cOrderStatus,"5") == 0){//已经撤单
+//            tmpit->second["exchange_rtnorder_action"] =tmpendtime;
+//        }else if(strcmp(cOrderStatus,"0") == 0){//全部成交
+//            tmpit->second["exchange_rtnorder_alltrade"] = tmpendtime;
+//        }
+//    }
+    string info;
+    info.append(BrokerID);info.append("\t");
+    info.append(InvestorID);info.append("\t");
+    info.append(InstrumentID);info.append("\t");
+    info.append(OrderLocalID);info.append("\t");
+//    info.append(cRequestId);info.append("\t");
+    info.append(ClientID);info.append("\t");
+    info.append(OrderSysID);info.append("\t");
+    info.append(cVolumeTraded);info.append("\t");
+//    info.append(iVolumeTotal);info.append("\t");
+//    info.append(StatusMsg);info.append("\t");
+//    info.append(cOrderSubmitStatus);info.append("\t");
+    info.append(cOrderStatus);info.append("\t");
+    return info;
 }

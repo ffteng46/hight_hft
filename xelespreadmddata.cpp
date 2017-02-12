@@ -37,6 +37,15 @@ static char NIC[9];
 extern boost::thread_group thread_log_group;
 extern CTraderSpi* pUserSpi;
 extern unordered_map<string,unordered_map<string,int>> positionmap;
+//价格变动单位
+extern double tick;
+//跌停价格
+extern double min_price;
+//涨停价格
+extern double max_price;
+//报单触发信号
+extern int cul_times;
+extern int default_volume;
 // USER_API参数
 CXeleMdApi* mduserapi;
 static void loadConfigFile(char *iniName) {
@@ -48,31 +57,31 @@ static void loadConfigFile(char *iniName) {
     /*
      * load USERID
      */
-    FILE *ini = popen("sed 's/USERID=\\(.*\\)/\\1/g;tx;d;:x' refer.ini", "r");
+    FILE *ini = popen("sed 's/USERID=\\(.*\\)/\\1/g;tx;d;:x' config/refer.ini", "r");
     fscanf(ini, "%s\n", USERID);
     pclose(ini);
     /*
      * load PASSWD
      */
-    ini = popen("sed 's/PASSWD=\\(.*\\)/\\1/g;tx;d;:x' refer.ini", "r");
+    ini = popen("sed 's/PASSWD=\\(.*\\)/\\1/g;tx;d;:x' config/refer.ini", "r");
     fscanf(ini, "%s\n", PASSWD);
     pclose(ini);
     /*
      * load FRONTADDRESS
      */
-    ini = popen("sed 's/FRONTADDRESS=\\(.*\\)/\\1/g;tx;d;:x' refer.ini", "r");
+    ini = popen("sed 's/FRONTADDRESS=\\(.*\\)/\\1/g;tx;d;:x' config/refer.ini", "r");
     fscanf(ini, "%s\n", FRONTADDRESS);
     pclose(ini);
     /*
      * load MCASTADDRESS
      */
-    ini = popen("sed 's/MCASTADDRESS=\\(.*\\)/\\1/g;tx;d;:x' refer.ini", "r");
+    ini = popen("sed 's/MCASTADDRESS=\\(.*\\)/\\1/g;tx;d;:x' config/refer.ini", "r");
     fscanf(ini, "%s\n", MCASTADDRESS);
     pclose(ini);
     /*
      * load NIC
      */
-    ini = popen("sed 's/NIC=\\(.*\\)/\\1/g;tx;d;:x' refer.ini", "r");
+    ini = popen("sed 's/NIC=\\(.*\\)/\\1/g;tx;d;:x' config/refer.ini", "r");
     fscanf(ini, "%s\n", NIC);
     pclose(ini);
 
@@ -121,10 +130,12 @@ void *job_recv_market_data() {
     while (g_md_switch) {
         if (RecvShfeMarketDataTick(handle, &mdtick)) {
             if (mdtick.md_type[0] == 'M') {
-                printXeleShfeHighLevelOneMarketData(log, "ShfeHighLevelOneMarketData", &mdtick.type_high);
+                //printXeleShfeHighLevelOneMarketData(log, "ShfeHighLevelOneMarketData", &mdtick.type_high);
+                OnRtnSHFEMarketData(&mdtick.type_high);
             }
             else if (mdtick.md_type[0] == 'S') {
                 printXeleShfeLowLevelOneMarketData(log, "ShfeLowLevelOneMarketData", &mdtick.type_low);
+                //OnRtnSHFEMarketData(&mdtick.type_low);
             }
             else if (mdtick.md_type[0] == 'Q') {
                 printXeleShfeDepthMarketData(log, "ShfeDepthMarketData", &mdtick.type_depth);
@@ -134,6 +145,10 @@ void *job_recv_market_data() {
 }
 
 int initMarketDataApi() {
+    if(tick == 0 || min_price == 0||max_price == 0||cul_times == 0 ||default_volume == 0){
+        cout<<"error:tick,min_price,max_price,cul_time,default_volume must not be 0!!!!!!!!!!!";
+        exit(0);
+    }
     /*
      * 读取refer.ini
      */
@@ -161,6 +176,7 @@ int initMarketDataApi() {
     int status = mduserapi->LoginInit(FRONTADDRESS, MCASTADDRESS, NIC, &login_info);
     if (status == XELEAPI_SUCCESS) {
         cout << "XELEAPI_SUCCESS" << endl;
+        initPriceGap();
     }else {
         mduserapi->Release();
         cout << "LoginInit fail. Exit." << endl;
@@ -173,7 +189,7 @@ int initMarketDataApi() {
     //pthread_t md_thread;
     g_md_switch = 1;
     thread_log_group.create_thread(job_recv_market_data);
-    pthread_create(&md_thread, NULL, job_recv_market_data, mduserapi);
+    //pthread_create(&md_thread, NULL, job_recv_market_data, mduserapi);
 //    do {
 //        cout << "Input 'q' to disconnect API:";
 //        getline(cin, msg);

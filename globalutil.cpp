@@ -20,35 +20,52 @@ list<string> mkdata;
 extern boost::lockfree::queue<LogMsg*> mkdataqueue;
 ///日志消息队列
 extern boost::lockfree::queue<LogMsg*> logqueue;
+extern int offset_flag;
+//买平标志,1开仓；2平仓
+extern int longPstIsClose;
+extern int shortPstIsClose;
+//价格变动单位
+extern double tick;
+//跌停价格
+extern double min_price;
+//涨停价格
+extern double max_price;
+// UserApi对象
+extern CTraderSpi* pUserSpi;
 //gap list map
-unordered_map<double,double[]> map_price_gap;
+unordered_map<double,vector<double>> map_price_gap;
+extern char singleInstrument[30];
+extern int default_volume;
 //preious price
 double previous_price = 0;
+
 //上涨
 int up_culculate = 0;
 //下跌
 int down_culculate = 0;
 //上一次价格所处的区间
-int price_gap = -1;
+int last_gap = -1;
 //报单触发信号
-int cul_times = 2;
+extern int cul_times;
 //盈利数字
 double profit = 0;
 //交易次数
 unsigned int trade_num = 0;
 // 下单量
-int trade_default[];
+int trade_default[4]={3,6,9,12};
 //持仓比
-int trade_bi=[];
+int trade_bi[1];
+
 int bidpst=0;
 int askpst=0;
 int great_than_three_bid = 0;
 int great_than_three_ask = 0;
 int bi=30;
-int default_volume = 1;
+
 double settlementPrice = 10;
+string sep = ";";
 //保存交易数据
-int tradeInfo[];
+int tradeInfo[1];
 void logEngine(){
     //cout<<"启动进程"<<endl;
     cout<<boosttoolsnamespace::CBoostTools::gbktoutf8("启动进程")<<endl;
@@ -65,11 +82,8 @@ void logEngine(){
             string info;
             char cw[2048]={'\0'};
             info = pData->getMsg();
-//            if(info.size() == 0){
-//                continue;
-//            }
             info = getCurrentSystemTime()+" "+info;
-            cout<<"运行日志："<<info<<";size="<<info.size()<<";cap="<<endl;
+            //cout<<"运行日志："<<info<<";size="<<info.size()<<";cap="<<endl;
             info.copy(cw,info.size(),0);
             //cout<<"日志："<<cw<<";size="<<strlen(cw)<<endl;
             in<<cw<<endl;
@@ -83,28 +97,28 @@ void marketdataEngine(){
 	ofstream in;
 	in.open(filepath_mk,ios::app); //ios::trunc表示在打开文件前将文件清空,由于是写入,文件不存在则创建
     int c = 0;
-//	while(1){
-//        LogMsg *pData;
-//        if(mkdataqueue.empty()){
-//            sleep(1);
-//        }else if(mkdataqueue.pop(pData)){
-//            c++;
-//            string info;
-//            char cw[2048]={'\0'};
+    while(1){
+        LogMsg *pData;
+        if(mkdataqueue.empty()){
+            sleep(1);
+        }else if(mkdataqueue.pop(pData)){
+            c++;
+            string info;
+            char cw[2048]={'\0'};
 
-//            info = pData->getMsg();
-//            if(info.size() == 0){
-//                continue;
-//            }
-//            info = getCurrentSystemTime()+" "+info;
-//            cout<<"行情日志："<<info<<";size="<<info.size()<<endl;
-//            info.copy(cw,info.size(),0);
-//            //cout<<"日志："<<cw<<";size="<<strlen(cw)<<endl;
-//            in<<cw<<endl;
-//        }
-//        //cout<<"yigong="<<c<<endl;
-//        //in.flush();
-//	}
+            info = pData->getMsg();
+            if(info.size() == 0){
+                continue;
+            }
+            info = getCurrentSystemTime()+" "+info;
+            //cout<<"行情日志："<<info<<";size="<<info.size()<<endl;
+            info.copy(cw,info.size(),0);
+            //cout<<"日志："<<cw<<";size="<<strlen(cw)<<endl;
+            in<<cw<<endl;
+        }
+        //cout<<"yigong="<<c<<endl;
+        //in.flush();
+    }
 	in.close();//关闭文件
 }
 // 获取系统的当前时间，单位微秒(us)
@@ -193,21 +207,21 @@ string getCloseMethod(){
     return orderoffset;
 }
 void initPriceGap(){
-    double price_tick = 0.5;
-    double min_price = 0;
-    double max_price = 10;
     //int gaps = 2*(max_price - min_price);
     double tmp_price = min_price;
     while(true){
         if(tmp_price <= max_price){
             double down_gap = (tmp_price - min_price)*2;
-            double up_gap = down_gap + 1;
-            double gap_list[2] = [down_gap,up_gap];
+            double up_gap = down_gap + 2*tick;
+            vector<double> gap_list;
+            //gap_list.push_back();
+            gap_list[0] = down_gap;
+            gap_list[1] = up_gap;
             map_price_gap[tmp_price] = gap_list;
         }else{
             break;
         }
-        tmp_price += price_tick;
+        tmp_price += tick;
     }
 }
 
@@ -219,32 +233,36 @@ void OnRtnSHFEMarketData(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
     auto chro_start_time = boost::chrono::high_resolution_clock::now();
     string marketdata;
     stringstream ss;
-    char instrumentID[17] = pDepthMarketData->Instrument;
-    TXeleMdFtdcTimeType UpdateTime;
-    TXeleMdFtdcMillisecType UpdateMillisec;
-    TXeleMdFtdcVolumeType Volume;
+    char instrumentID[17] = {'\0'};
+    strcpy(instrumentID,pDepthMarketData->Instrument);
+    int com = strcmp(singleInstrument,instrumentID);
+    if(com != 0){
+        return;
+    }
+    TXeleMdFtdcMillisecType UpdateMillisec = pDepthMarketData->UpdateMillisec;
+    TXeleMdFtdcVolumeType Volume = pDepthMarketData->Volume;
     TXeleMdFtdcPriceType lastPrice = pDepthMarketData->LastPrice;
-    TXeleMdFtdcMoneyType Turnover;
-    TXeleMdFtdcLargeVolumeType OpenInterest;
+    TXeleMdFtdcMoneyType Turnover = pDepthMarketData->Turnover;
+    TXeleMdFtdcLargeVolumeType OpenInterest = pDepthMarketData->OpenInterest;
     TXeleMdFtdcPriceType bidPrice = pDepthMarketData->BidPrice;
     TXeleMdFtdcPriceType askPrice = pDepthMarketData->AskPrice;
-    TXeleMdFtdcVolumeType BidVolume;
-    TXeleMdFtdcVolumeType AskVolume;
+//    TXeleMdFtdcVolumeType BidVolume = pDepthMarketData->BidVolume;
+//    TXeleMdFtdcVolumeType AskVolume = pDepthMarketData->AskVolume;
 
     if(previous_price == 0){
         previous_price = lastPrice;
         return;
     }
-    double gap_list[];
+    vector<double> gap_list;
     //cant find
     if(map_price_gap.find(lastPrice) == map_price_gap.end()){
         string msg = "can not find map_price_gap item: price=" + boost::lexical_cast<string>(lastPrice);
-        LogMsg logmsg = new LogMsg();
-        logmsg.setMsg(msg);
-        logqueue.push(&logmsg);
+        LogMsg *logmsg = new LogMsg();
+        logmsg->setMsg(msg);
+        logqueue.push(logmsg);
         return;
     }else{
-        unordered_map<double,double[]>::iterator map_it = map_price_gap.find(lastPrice);
+        unordered_map<double,vector<double>>::iterator map_it = map_price_gap.find(lastPrice);
         gap_list = map_it->second;
     }
     double gap = 0;
@@ -257,27 +275,29 @@ void OnRtnSHFEMarketData(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
         return;
     }
     previous_price = lastPrice;
-    if(price_gap == -1){
-        price_gap = gap;
+    if(last_gap == -1){
+        last_gap = gap;
         return;
-    }else if(price_gap == gap){
+    }else if(last_gap == gap){
         return;
-    }else if(price_gap < gap){
+    }else if(last_gap < gap){
         down_culculate = 0;
         up_culculate += 1;
-    }else if(price_gap > gap){
+    }else if(last_gap > gap){
         down_culculate += 1;
         up_culculate = 0;
     }
-
-    price_gap = gap;
+    //开平
+    char char_orderoffset[3]={'\0'};
+    string orderoffset;
+    last_gap = gap;
     if(up_culculate >= cul_times){
         //sell
         char char_orderdir[] = "1";
         //开平判断
-        if(isclose == 1){//开仓
+        if(shortPstIsClose == 1){//开仓
             orderoffset = "0";
-        }else if(isclose == 2){//平仓  开仓 '0';平仓 '1';平今 '3';平昨 '4';强平 '2'
+        }else if(shortPstIsClose == 2){//平仓  开仓 '0';平仓 '1';平今 '3';平昨 '4';强平 '2'
             orderoffset = getCloseMethod();
         }
         strcpy(char_orderoffset,orderoffset.c_str());
@@ -286,35 +306,27 @@ void OnRtnSHFEMarketData(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
         //买
         char char_orderdir[] = "0";
         //开平判断
-        if(isclose == 1){//开仓
+        if(longPstIsClose == 1){//开仓
             orderoffset = "0";
-        }else if(isclose == 2){//平仓  开仓 '0';平仓 '1';平今 '3';平昨 '4';强平 '2'
+        }else if(longPstIsClose == 2){//平仓  开仓 '0';平仓 '1';平今 '3';平昨 '4';强平 '2'
             orderoffset = getCloseMethod();
         }
         strcpy(char_orderoffset,orderoffset.c_str());
-        pUserSpi->md_orderinsert(askPrice,char_orderdir,char_orderoffset,instrumentID,default_volume);
+        pUserSpi->md_orderinsert(bidPrice,char_orderdir,char_orderoffset,instrumentID,default_volume);
     }
 
     //处理行情
     int64_t end1 = GetSysTimeMicros();
     string msg;
-    char Instrument [17];
-    TXeleMdFtdcTimeType UpdateTime;
-    TXeleMdFtdcMillisecType UpdateMillisec;
-    TXeleMdFtdcVolumeType Volume;
-    TXeleMdFtdcPriceType LastPrice;
-    TXeleMdFtdcMoneyType Turnover;
-    TXeleMdFtdcLargeVolumeType OpenInterest;
-    TXeleMdFtdcPriceType BidPrice;
-    TXeleMdFtdcPriceType AskPrice;
-    TXeleMdFtdcVolumeType BidVolume;
-    TXeleMdFtdcVolumeType AskVolume;
+
     /*string msg = "处理信号花费:" + string(GetDiffTime(end1,start_time));
     LogMsg logmsg;
     logmsg.setMsg(msg);
     logqueue.push(&logmsg)*/;
 
     ///最后修改时间
+    TXeleMdFtdcTimeType UpdateTime;
+    strcpy(UpdateTime, pDepthMarketData->UpdateTime);
     marketdata.append("UpdateTime=");
     marketdata.append(pDepthMarketData->UpdateTime);
     marketdata.append(sep);
@@ -347,7 +359,7 @@ void OnRtnSHFEMarketData(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
     marketdata.append(char_sv1);
     marketdata.append(sep);
     marketdata.append("InstrumentID=");
-    marketdata.append(pDepthMarketData->InstrumentID);
+    marketdata.append(instrumentID);
     marketdata.append(sep);
     ///最新价
     marketdata.append("LastPrice=");
@@ -357,14 +369,14 @@ void OnRtnSHFEMarketData(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
     marketdata.append(lastprice);
     marketdata.append(sep);
     ///数量
-    TThostFtdcVolumeType	Volume = pDepthMarketData->Volume;
+//    TUstpFtdcVolumeType	Volume = pDepthMarketData->Volume;
     char char_vol[20] = {'\0'};
     sprintf(char_vol,"%d",Volume);
     marketdata.append("Volume=");
     marketdata.append(char_vol);
     marketdata.append(sep);
     ///持仓量
-    TThostFtdcLargeVolumeType	OpenInterest = pDepthMarketData->OpenInterest;
+//    TUstpFtdcLargeVolumeType	OpenInterest = pDepthMarketData->OpenInterest;
     char char_opi[20] = {'\0'};
     sprintf(char_opi,"%d",OpenInterest);
     marketdata.append("OpenInterest=");
@@ -373,65 +385,33 @@ void OnRtnSHFEMarketData(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
 
 
     ///最后修改毫秒
-    TThostFtdcMillisecType	UpdateMillisec = pDepthMarketData->UpdateMillisec;
+//    TUstpFtdcMillisecType	UpdateMillisec = pDepthMarketData->UpdateMillisec;
     char char_ums[20] = {'\0'};
     sprintf(char_ums,"%d",UpdateMillisec);
     marketdata.append("UpdateMillisec=");
     marketdata.append(char_ums);
     marketdata.append(sep);
-
-    /*
-    ///申买价二
-    TThostFtdcPriceType	BidPrice2;
-    ///申买量二
-    TThostFtdcVolumeType	BidVolume2;
-    ///申卖价二
-    TThostFtdcPriceType	AskPrice2;
-    ///申卖量二
-    TThostFtdcVolumeType	AskVolume2;
-    ///申买价三
-    TThostFtdcPriceType	BidPrice3;
-    ///申买量三
-    TThostFtdcVolumeType	BidVolume3;
-    ///申卖价三
-    TThostFtdcPriceType	AskPrice3;
-    ///申卖量三
-    TThostFtdcVolumeType	AskVolume3;
-    ///申买价四
-    TThostFtdcPriceType	BidPrice4;
-    ///申买量四
-    TThostFtdcVolumeType	BidVolume4;
-    ///申卖价四
-    TThostFtdcPriceType	AskPrice4;
-    ///申卖量四
-    TThostFtdcVolumeType	AskVolume4;
-    ///申买价五
-    TThostFtdcPriceType	BidPrice5;
-    ///申买量五
-    TThostFtdcVolumeType	BidVolume5;
-    ///申卖价五
-    TThostFtdcPriceType	AskPrice5;
-    ///申卖量五
-    TThostFtdcVolumeType	AskVolume5;
-    */
     ///当日均价
-    marketdata.append("AveragePrice=");
-    ss << pDepthMarketData->AveragePrice;
-    string AveragePrice;
-    ss >> AveragePrice;
-    marketdata.append(AveragePrice);
+    marketdata.append("turnover=");
+    ss << Turnover;
+    string str_Turnover;
+    ss >> str_Turnover;
+    marketdata.append(str_Turnover);
     marketdata.append(sep);
     ss.clear();
+    LogMsg *logmsg = new LogMsg();
+    logmsg->setMsg(msg);
+    mkdataqueue.push(logmsg);
 //    logmsg.setMsg(marketdata);
 //    mkdataqueue.push(&logmsg);
     //处理行情
     int64_t end2 = GetSysTimeMicros();
     auto chro_end_time = boost::chrono::high_resolution_clock::now();
     auto pro_time = boost::chrono::duration<double>(chro_end_time - chro_start_time).count();
-    stringstream timss;
-    timss<<pro_time;
-    cout<<timss.str()<<endl;
-    cout<<marketdata<<endl;
+//    stringstream timss;
+//    timss<<pro_time;
+//    cout<<timss.str()<<endl;
+//    cout<<marketdata<<endl;
     //msg = "记录行情花费:" + string(GetDiffTime(end2,end1)) + ";实际处理时间：" + timss.str();
-    LOG(INFO)<<msg;
+   // LOG(INFO)<<msg;
 }

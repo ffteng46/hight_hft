@@ -21,6 +21,7 @@
 #include <glog/log_severity.h>
 #include <boost/locale.hpp>
 #include "boost_tools.h"
+#include <XeleMdFtdcUserApiStruct.h>
 using namespace std;
 class LogMsg{
 public:

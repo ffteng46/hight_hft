@@ -73,7 +73,7 @@ struct CXeleShfeMarketDataUnion
 extern bool RecvMarketDataTick(int handle, MarketDataTick* mdtick);
 extern bool RecvShfeMarketDataTick(int handle, CXeleShfeMarketDataUnion* tick);
 int initMarketDataApi() ;
-
+void initPriceGap();
 class MDUSER_API_EXPORT CXeleMdApi
 {
 public:

@@ -24,7 +24,9 @@ public:
 	virtual void OnRspOrderInsert(CUstpFtdcInputOrderField *pInputOrder, CUstpFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast);
 	virtual void OnRspOrderAction(CUstpFtdcOrderActionField *pOrderAction, CUstpFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast);
 	virtual void OnRspUserPasswordUpdate(CUstpFtdcUserPasswordUpdateField *pUserPasswordUpdate, CUstpFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast);
-
+    virtual void OnHeartBeatWarning(int nTimeLapse);
+    ///错误应答
+    virtual void OnRspError(CUstpFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast);
 	virtual void OnRtnTrade(CUstpFtdcTradeField *pTrade);
 	virtual void OnRtnOrder(CUstpFtdcOrderField *pOrder);
 	virtual void OnRtnInstrumentStatus(CUstpFtdcInstrumentStatusField *pInstrumentStatus);
@@ -54,10 +56,18 @@ public:
 	void Show(CUstpFtdcOrderField *pOrder);
 	void Show(CUstpFtdcTradeField *pTrade);
 	void Show(CUstpFtdcRspInstrumentField *pRspInstrument);
-    string getInvestorOrderInsertInfo(CUstpFtdcInputOrderField *order);
+
 private:
+    ///请求查询合约
+    void ReqQryInstrument(char *instrumentid);
+    string getInvestorOrderInsertInfo(CUstpFtdcInputOrderField *order);
+    //获取交易所回报响应
+    string getRtnOrder(CUstpFtdcOrderField *pOrder);
+    int processtrade(CUstpFtdcTradeField *pTrade);
     //将投资者持仓信息写入文件保存
     int storeInvestorPosition(CUstpFtdcRspInvestorPositionField *pInvestorPosition);
+    //保存投资者成交信息
+    string storeInvestorTrade(CUstpFtdcTradeField *pTrade);
     ///请求查询投资者持仓
     void ReqQryInvestorPosition();
     ///用户登录请求

@@ -24,13 +24,14 @@ char  MD_FRONT_ADDR[] = "tcp://116.228.171.216:61213";// 前置地址
 char  FRONT_ADDR[] = "tcp://116.228.171.216:61205";// 前置地址 新湖期货
 TUstpFtdcBrokerIDType  BROKER_ID={'\0'};				// 经纪公司代码
 TUstpFtdcUserIDType INVESTOR_ID = {'\0'};			// 投资者代码
-//TThostFtdcInvestorIDType INVESTOR_ID = "83600689";			// 投资者代码
 TUstpFtdcPasswordType  PASSWORD = {"\0"};			// 用户密码
 //TThostFtdcInstrumentIDType INSTRUMENT_ID = "IF1509";	// 合约代码
 //TThostFtdcDirectionType	DIRECTION = THOST_FTDC_D_Sell;	// 买卖方向
 //TThostFtdcPriceType	LIMIT_PRICE = 38850;				// 价格
 //char *ppInstrumentID[] = {"m1705-C-2450"};// 行情订阅列表
 char **ppInstrumentID;// 行情订阅列表
+//单一合约
+char singleInstrument[30]={'\0'};
 vector<string> quoteList ;
 int iInstrumentID = 1;									// 行情订阅数量
 //连接到服务器端的客户数量
@@ -38,14 +39,21 @@ int customercount=0;
 // 请求编号
 int iRequestID = 0;
 int g_nOrdLocalID = 1;
+//报单触发信号
+int cul_times = 0;
+//跌停价格
+double min_price = 0;
+//涨停价格
+double max_price = 0;
 //价格变动单位
-double tick = 1;
+double tick = 0;
 //卖出价格振幅
 int tickSpreadSell = 3;
 //买入价格振幅
 int tickSpreadBuy = 3;
 //买平标志,1开仓；2平仓
-int isclose = 1;
+int longPstIsClose = 1;
+int shortPstIsClose = 1;
 //价格浮动倍数
 int bidmultipy = 1;
 //价格浮动倍数卖
@@ -53,7 +61,7 @@ int askmultipy = 1;
 //持仓预警值
 int pstalarm = 3;
 //默认下单量
-int ordervol = 1;
+int default_volume = 1;
 //买卖价差比较值
 int bid_ask_spread = 80;
 //成交量基数
@@ -71,7 +79,10 @@ char char_front_id[12] = {'\0'};
 char char_session_id[20] = {'\0'};
 string str_front_id;
 string str_sessioin_id;
-
+//longpstlimit
+int longpstlimit = 0;
+//shortpstlimit
+int shortpstlimit = 0;
 //g_nOrdLocalID对应关系
 unordered_map<string,unordered_map<string,int64_t>> seq_map_g_nOrdLocalID;
 //ordersysid对应关系
@@ -90,25 +101,36 @@ void TradeProcess::startTrade()
     cout<<"用户密码="<<PASSWORD<<endl;
     cout<<"交易前置="<<FRONT_ADDR<<endl;
     cout<<"行情前置="<<MD_FRONT_ADDR<<endl;
-    cout<<"价格变动单位="<<tick<<endl;
+    cout<<"报单触发信号="<<cul_times<<endl;
+//    cout<<"跌停价格="<<min_price<<endl;
+//    cout<<"涨停价格="<<max_price<<endl;
     cout<<"持仓预警值="<<pstalarm<<endl;
-    cout<<"默认下单量="<<ordervol<<endl;
-    cout<<"买卖价差比较值="<<bid_ask_spread<<endl;
-    cout<<"合约为："<<endl;
-    for(int i = 0;i < quoteList.size();i++){
-        //str_inslist = str_inslist + string(ppInstrumentID[i]) + " ";
-        cout<<ppInstrumentID[i]<<endl;
-    }
-    cout<<"合约数量为:"<<iInstrumentID<<endl;
+    cout<<"默认下单量="<<default_volume<<endl;
+    //cout<<"买卖价差比较值="<<bid_ask_spread<<endl;
+//    cout<<"合约为："<<singleInstrument<<endl;
+//    for(int i = 0;i < quoteList.size();i++){
+//        //str_inslist = str_inslist + string(ppInstrumentID[i]) + " ";
+//        cout<<ppInstrumentID[i]<<endl;
+//    }
+//    cout<<"合约数量为:"<<iInstrumentID<<endl;
 ////recordRunningMsg(msg);
 //        //cout<<logmsg.getMsg()<<endl;
 //    }
 //    getchar();
+    cout<<"=========================================="<<endl;
+    cout<<"是否继续?0 否，1是"<<endl;
+    int isok;
+    cin>>isok;
+    if(isok != 1){
+        exit(0);
+    }
     initThread(0);
-    system("pause");
     tradeinit();
-
-    system("pause");
+//    cout<<"是否继续?0 否，1是"<<endl;
+//    cin>>isok;
+//    if(isok != 1){
+//        exit(0);
+//    }
 }
 /************************************************************************/
 /* 初始化参数列表                                                                     */
@@ -132,16 +154,26 @@ void TradeProcess::datainit(){
                     strcpy(INVESTOR_ID,vec[1].c_str());
                 }else if("brokerid"==vec[0]){
                     strcpy(BROKER_ID,vec[1].c_str());
+                }else if("default_volume"==vec[0]){
+                    default_volume = boost::lexical_cast<int>(vec[1]);
                 }else if("password"==vec[0]){
                     strcpy(PASSWORD,vec[1].c_str());
                 }else if("tradeFrontAddr"==vec[0]){
                     strcpy(FRONT_ADDR,vec[1].c_str());
+                }else if("singleInstrument"==vec[0]){
+                    strcpy(singleInstrument,vec[1].c_str());
                 }else if("mdFrontAddr"==vec[0]){
                     strcpy(MD_FRONT_ADDR,vec[1].c_str());
-                }else if("tick"==vec[0]){
-                    tick = boost::lexical_cast<double>(vec[1]);
+                }else if("cul_times"==vec[0]){
+                    cul_times = boost::lexical_cast<int>(vec[1]);
+                }else if("min_price"==vec[0]){
+                    min_price = boost::lexical_cast<double>(vec[1]);
+                }else if("max_price"==vec[0]){
+                    max_price = boost::lexical_cast<double>(vec[1]);
                 }else if("pstalarm"==vec[0]){
                     pstalarm = boost::lexical_cast<int>(vec[1]);
+                    longpstlimit = pstalarm;
+                    shortpstlimit = pstalarm;
                 }else if("instrumentList" == vec[0]){
                     /************************************************************************/
                     /* 如果读到      instrumentList，则保存到本程序中                                                               */
@@ -209,7 +241,7 @@ void TradeProcess::tradeinit(){
 void TradeProcess::initThread(int sendtype)
 {
     printf("经纪公司编号=[%s]\n","pInvestorMargin->BrokerID");
-    thread_log_group.create_thread(logEngine);
+    thread_log_group.create_thread(marketdataEngine);
 //    thread_log_group.create_thread(test);
     //thread_log_group.create_thread(marketdataEngine);
     //thread_log_group.join_all();
