@@ -94,6 +94,11 @@ typedef int TUstpFtdcDataCenterIDType;
 typedef int TUstpFtdcSettlementIDType;
 
 /////////////////////////////////////////////////////////////////////////
+///TFtdcUstpBusinessLocalIDType是一个本地业务标识类型
+/////////////////////////////////////////////////////////////////////////
+typedef int TUstpFtdcBusinessLocalIDType;
+
+/////////////////////////////////////////////////////////////////////////
 ///TFtdcUstpMonthType是一个月份类型
 /////////////////////////////////////////////////////////////////////////
 typedef int TUstpFtdcMonthType;
@@ -166,7 +171,7 @@ typedef char TUstpFtdcExchangeIDType[11];
 /////////////////////////////////////////////////////////////////////////
 ///TFtdcUstpDateType是一个日期类型
 /////////////////////////////////////////////////////////////////////////
-typedef char TUstpFtdcDateType[9];
+typedef char TUstpFtdcDateType[10];
 
 /////////////////////////////////////////////////////////////////////////
 ///TFtdcUstpTimeType是一个时间类型
@@ -251,7 +256,7 @@ typedef char TUstpFtdcCustomType[65];
 /////////////////////////////////////////////////////////////////////////
 ///TFtdcUstpTradingDayType是一个交易日类型
 /////////////////////////////////////////////////////////////////////////
-typedef char TUstpFtdcTradingDayType[9];
+typedef char TUstpFtdcTradingDayType[10];
 
 /////////////////////////////////////////////////////////////////////////
 ///TFtdcUstpDepartmentType是一个营业部类型
@@ -308,6 +313,14 @@ typedef char TUstpFtdcVolumeConditionType;
 #define USTP_FTDC_FCR_MemberOverPositionLimit '3'
 ///持仓非整数倍
 #define USTP_FTDC_FCR_NotMultiple '4'
+///违规
+#define USTP_FTDC_FCR_Violation '5'
+///其他
+#define USTP_FTDC_FCR_Other '6'
+///自然人临近交割
+#define USTP_FTDC_FCR_PersonDeliv '7'
+///客户套保超仓
+#define USTP_FTDC_FCR_HedgeOverPositionLimit '8'
 
 typedef char TUstpFtdcForceCloseReasonType;
 
@@ -354,6 +367,10 @@ typedef char TUstpFtdcOffsetFlagType;
 #define USTP_FTDC_OPT_AnyPrice '1'
 ///限价
 #define USTP_FTDC_OPT_LimitPrice '2'
+///最优价
+#define USTP_FTDC_OPT_BestPrice '3'
+///五档价
+#define USTP_FTDC_OPT_FiveLevelPrice '4'
 
 typedef char TUstpFtdcOrderPriceTypeType;
 
@@ -470,6 +487,8 @@ typedef char TUstpFtdcAccountDirectionType;
 #define USTP_FTDC_CHF_Arbitrage '2'
 ///套保
 #define USTP_FTDC_CHF_Hedge '3'
+///做市商
+#define USTP_FTDC_CHF_MarketMaker '4'
 
 typedef char TUstpFtdcHedgeFlagType;
 
@@ -522,6 +541,6 @@ typedef char TUstpFtdcIsActiveType;
 /////////////////////////////////////////////////////////////////////////
 ///TFtdcUstpCurrencyIDType是一个币种代码类型
 /////////////////////////////////////////////////////////////////////////
-typedef char TUstpFtdcCurrencyIDType[4];
+typedef char TUstpFtdcCurrencyIDType[5];
 
 #endif

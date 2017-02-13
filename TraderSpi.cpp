@@ -1,4 +1,4 @@
-// TraderSpi.cpp: implementation of the CTraderSpi class.
+﻿// TraderSpi.cpp: implementation of the CTraderSpi class.
 //
 //////////////////////////////////////////////////////////////////////
 
@@ -92,7 +92,7 @@ int CTraderSpi::md_orderinsert(double price,char *dir,char *offset,char * ins,in
     ///投资者代码
     strcpy(req.InvestorID, INVESTOR_ID);
     ///合约代码// UserApi对象
-    CUstpFtdcTraderApi* pUserApi;
+    //CUstpFtdcTraderApi* pUserApi;
     strcpy(req.InstrumentID, InstrumentID);
     ///报单引用
     strcpy(req.UserOrderLocalID, UserOrderLocalID);
@@ -189,11 +189,14 @@ void CTraderSpi::ReqUserLogin()
     cerr << "hello" <<endl;
     CUstpFtdcReqUserLoginField reqUserLogin;
     memset(&reqUserLogin,0,sizeof(CUstpFtdcReqUserLoginField));
+//    strcpy(reqUserLogin.BrokerID,BROKER_ID);
+//    strcpy(reqUserLogin.UserID, INVESTOR_ID);
+//    strcpy(reqUserLogin.Password, PASSWORD);
     strcpy(reqUserLogin.BrokerID,BROKER_ID);
     strcpy(reqUserLogin.UserID, INVESTOR_ID);
     strcpy(reqUserLogin.Password, PASSWORD);
     strcpy(reqUserLogin.UserProductInfo,"");
-    int iResult = m_pUserApi->ReqUserLogin(&reqUserLogin, ++iRequestID);
+    int iResult = pUserApi->ReqUserLogin(&reqUserLogin, ++iRequestID);
     printf("请求登录，BrokerID=[%s]UserID=[%s]\n",BROKER_ID,INVESTOR_ID);
     cerr << "--->>> 发送用户登录请求: " << ((iResult == 0) ? "成功" : "失败") << endl;
 #ifdef WIN32
@@ -230,7 +233,7 @@ void CTraderSpi:: OnFrontDisconnected(int nReason)
 void CTraderSpi::OnRspUserLogin(CUstpFtdcRspUserLoginField *pRspUserLogin, CUstpFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast)
 {
     cerr << "--->>> " << "OnRspUserLogin" << endl;
-    printf("登录失败...错误原因：%s\n",pRspInfo->ErrorMsg);
+    //printf("登录失败...错误原因：%s\n",pRspInfo->ErrorMsg);
     if (bIsLast && !IsErrorRspInfo(pRspInfo))
     //if (pRspInfo!=NULL&&pRspInfo->ErrorID!=0)
 	{
@@ -240,7 +243,7 @@ void CTraderSpi::OnRspUserLogin(CUstpFtdcRspUserLoginField *pRspUserLogin, CUstp
         printf("-----------------------------\n");
         //请求响应日志
         char char_msg[1024] = {'\0'};
-        sprintf(char_msg,"--->>>登陆成功， 获取当前交易日 = %s,获取当前报单引用 =%d",pUserApi->GetTradingDay(),g_nOrdLocalID );
+        sprintf(char_msg,"--->>>登陆成功,获取当前报单引用 =%d",g_nOrdLocalID );
         string msg(char_msg);
         LOG(INFO)<<msg;
         //ReqQryInvestorPosition();
@@ -256,7 +259,7 @@ void CTraderSpi::OnRspUserLogin(CUstpFtdcRspUserLoginField *pRspUserLogin, CUstp
         return;
     }
 
-    StartAutoOrder();
+    //StartAutoOrder();
 }
 void CTraderSpi::ReqQryInvestorPosition()
 {
@@ -448,11 +451,11 @@ void CTraderSpi::ReqQryInstrument(char *instrumentid)
 //    //strcpy(QryInstrument.ExchangeID,"CFFEX");
 //    //strcpy(QryInstrument.InstrumentID,"IF1206");
 //    pUserApi->ReqQryInstrument(&QryInstrument,g_nOrdLocalID++);
-
+    cerr << "--->>> " << "ReqQryInstrument,ins="<<instrumentid << endl;
     CUstpFtdcQryInstrumentField req;
     memset(&req, 0, sizeof(req));
     strcpy(req.InstrumentID, instrumentid);
-    //strcpy(req.ExchangeID,"CFFEX");
+    strcpy(req.ExchangeID,"SHFE");
     int iResult = pUserApi->ReqQryInstrument(&req, ++g_nOrdLocalID);
     cerr << "--->>> 请求查询合约: " << ((iResult == 0) ? "成功" : "失败") << endl;
     ReqQryInvestorPosition();

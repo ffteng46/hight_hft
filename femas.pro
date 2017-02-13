@@ -20,9 +20,6 @@ LIBS +=  -lpthread -lrt
 HEADERS += \
     TraderSpi.h \
     PublicFuncs.h \
-    USTPFtdcUserApiStruct.h \
-    USTPFtdcUserApiDataType.h \
-    USTPFtdcTraderApi.h \
     globalutil.h \
     boost_tools.h \
     Trade.h \

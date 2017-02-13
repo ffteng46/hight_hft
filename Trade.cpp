@@ -1,4 +1,4 @@
-// testTraderApi.cpp : 定义控制台应用程序的入口点。
+﻿// testTraderApi.cpp : 定义控制台应用程序的入口点。
 //
 #include "PublicFuncs.h"
 #include "TraderSpi.h"
@@ -106,6 +106,7 @@ void TradeProcess::startTrade()
 //    cout<<"涨停价格="<<max_price<<endl;
     cout<<"持仓预警值="<<pstalarm<<endl;
     cout<<"默认下单量="<<default_volume<<endl;
+    cout<<"单一合约="<<singleInstrument<<endl;
     //cout<<"买卖价差比较值="<<bid_ask_spread<<endl;
 //    cout<<"合约为："<<singleInstrument<<endl;
 //    for(int i = 0;i < quoteList.size();i++){
@@ -216,7 +217,7 @@ void TradeProcess::tradeinit(){
     cout<<"start to init tradeapi"<<endl;
     CUstpFtdcTraderApi *pTrader = CUstpFtdcTraderApi::CreateFtdcTraderApi("");
     g_puserapi=pTrader;
-
+    pUserApi = pTrader;
     CTraderSpi spi(pTrader);
     pTrader->RegisterFront(FRONT_ADDR);
     pTrader->SubscribePrivateTopic(USTP_TERT_RESTART);

@@ -60,6 +60,8 @@ struct CUstpFtdcRspUserLoginField
 	TUstpFtdcSequenceNoType	PrivateFlowSize;
 	///交易员私有流当前长度
 	TUstpFtdcSequenceNoType	UserFlowSize;
+	///业务发生日期
+	TUstpFtdcDateType	ActionDay;
 };
 ///用户登出请求
 struct CUstpFtdcReqUserLogoutField
@@ -144,6 +146,10 @@ struct CUstpFtdcInputOrderField
 	TUstpFtdcBusinessUnitType	BusinessUnit;
 	///用户自定义域
 	TUstpFtdcCustomType	UserCustom;
+	///本地业务标识
+	TUstpFtdcBusinessLocalIDType	BusinessLocalID;
+	///业务发生日期
+	TUstpFtdcDateType	ActionDay;
 };
 ///报单操作
 struct CUstpFtdcOrderActionField
@@ -168,6 +174,8 @@ struct CUstpFtdcOrderActionField
 	TUstpFtdcPriceType	LimitPrice;
 	///数量变化
 	TUstpFtdcVolumeType	VolumeChange;
+	///本地业务标识
+	TUstpFtdcBusinessLocalIDType	BusinessLocalID;
 };
 ///内存表导出
 struct CUstpFtdcMemDbField
@@ -292,6 +300,8 @@ struct CUstpFtdcRspInstrumentField
 	TUstpFtdcPriceType	StrikePrice;
 	///期权类型
 	TUstpFtdcOptionsTypeType	OptionsType;
+	///币种代码
+	TUstpFtdcCurrencyIDType	CurrencyID;
 };
 ///合约状态
 struct CUstpFtdcInstrumentStatusField
@@ -360,6 +370,10 @@ struct CUstpFtdcInstrumentStatusField
 	TUstpFtdcPriceType	StrikePrice;
 	///期权类型
 	TUstpFtdcOptionsTypeType	OptionsType;
+	///币种代码
+	TUstpFtdcCurrencyIDType	CurrencyID;
+	///进入本状态日期
+	TUstpFtdcDateType	EnterDate;
 };
 ///投资者资金查询
 struct CUstpFtdcQryInvestorAccountField
@@ -528,6 +542,8 @@ struct CUstpFtdcRspInvestorPositionField
 	TUstpFtdcVolumeType	FrozenPosition;
 	///平仓冻结持仓
 	TUstpFtdcVolumeType	FrozenClosing;
+	///平昨仓冻结持仓
+	TUstpFtdcVolumeType	YdFrozenClosing;
 	///冻结的权利金
 	TUstpFtdcMoneyType	FrozenPremium;
 	///最后一笔成交编号
@@ -722,6 +738,10 @@ struct CUstpFtdcTradeField
 	TUstpFtdcTimeType	TradeTime;
 	///清算会员编号
 	TUstpFtdcParticipantIDType	ClearingPartID;
+	///本地业务标识
+	TUstpFtdcBusinessLocalIDType	BusinessLocalID;
+	///业务发生日期
+	TUstpFtdcDateType	ActionDay;
 };
 ///报单
 struct CUstpFtdcOrderField
@@ -770,6 +790,10 @@ struct CUstpFtdcOrderField
 	TUstpFtdcBusinessUnitType	BusinessUnit;
 	///用户自定义域
 	TUstpFtdcCustomType	UserCustom;
+	///本地业务标识
+	TUstpFtdcBusinessLocalIDType	BusinessLocalID;
+	///业务发生日期
+	TUstpFtdcDateType	ActionDay;
 	///交易日
 	TUstpFtdcTradingDayType	TradingDay;
 	///会员编号
@@ -958,6 +982,8 @@ struct CUstpFtdcMarketDataUpdateTimeField
 	TUstpFtdcTimeType	UpdateTime;
 	///最后修改毫秒
 	TUstpFtdcMillisecType	UpdateMillisec;
+	///业务发生日期
+	TUstpFtdcDateType	ActionDay;
 };
 ///深度行情
 struct CUstpFtdcDepthMarketDataField
@@ -1046,12 +1072,20 @@ struct CUstpFtdcDepthMarketDataField
 	TUstpFtdcTimeType	UpdateTime;
 	///最后修改毫秒
 	TUstpFtdcMillisecType	UpdateMillisec;
+	///业务发生日期
+	TUstpFtdcDateType	ActionDay;
 };
 ///订阅合约的相关信息
 struct CUstpFtdcSpecificInstrumentField
 {
 	///合约代码
 	TUstpFtdcInstrumentIDType	InstrumentID;
+};
+///多播通道心跳
+struct CUstpFtdcMultiChannelHeartBeatField
+{
+	///心跳超时时间（秒）
+	TUstpFtdcVolumeType	UstpMultiChannelHeartBeatTimeOut;
 };
 
 
