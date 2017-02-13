@@ -301,7 +301,8 @@ void OnRtnSHFEMarketData(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
             orderoffset = getCloseMethod();
         }
         strcpy(char_orderoffset,orderoffset.c_str());
-        pUserSpi->md_orderinsert(askPrice,char_orderdir,char_orderoffset,instrumentID,default_volume);
+        //pUserSpi->md_orderinsert(askPrice,char_orderdir,char_orderoffset,instrumentID,default_volume);
+        pUserSpi->md_orderinsert(max_price,char_orderdir,char_orderoffset,instrumentID,default_volume);
     }else if(down_culculate >= cul_times){
         //买
         char char_orderdir[] = "0";
@@ -312,7 +313,8 @@ void OnRtnSHFEMarketData(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
             orderoffset = getCloseMethod();
         }
         strcpy(char_orderoffset,orderoffset.c_str());
-        pUserSpi->md_orderinsert(bidPrice,char_orderdir,char_orderoffset,instrumentID,default_volume);
+       // pUserSpi->md_orderinsert(bidPrice,char_orderdir,char_orderoffset,instrumentID,default_volume);
+        pUserSpi->md_orderinsert(min_price,char_orderdir,char_orderoffset,instrumentID,default_volume);
     }
 
     //处理行情
