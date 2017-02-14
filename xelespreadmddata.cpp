@@ -124,6 +124,7 @@ public:
 int g_md_switch = 1;
 
 void *job_recv_market_data() {
+    cerr << "--->>> " << "job_recv_market_data"  << endl;
     int handle = mduserapi->GetHandle();
     CXeleShfeMarketDataUnion mdtick;
     ofstream log("RecvMarketDataTick.log");
@@ -145,8 +146,23 @@ void *job_recv_market_data() {
 }
 
 int initMarketDataApi() {
+    cerr << "--->>> " << "initMarketDataApi"  << endl;
     if(tick == 0 || min_price == 0||max_price == 0||cul_times == 0 ||default_volume == 0){
-        cout<<"error:tick,min_price,max_price,cul_time,default_volume must not be 0!!!!!!!!!!!";
+//        char char_tick[10]={'\0'};
+//        sprintf(char_tick,"%f",tick);
+//        char char_min_price[10]={'\0'};
+//        sprintf(char_min_price,"%f",min_price);
+//        char char_max_price[10]={'\0'};
+//        sprintf(char_max_price,"%f",max_price);
+//        char char_cul_times[10]={'\0'};
+//        sprintf(char_cul_times,"%f",cul_times);
+//        char char_default_volume[10]={'\0'};
+//        sprintf(char_default_volume,"%f",default_volume);
+        char msg[1024]={'\0'};
+        sprintf(msg,"error:tick=%f,min_price=%f,max_price=%f,cul_time=%f,default_volume=%f must not be 0!!!!!!!!!!!",
+               tick,min_price,max_price,cul_times,default_volume );
+        //cout<<"error:tick,min_price,max_price,cul_time,default_volume must not be 0!!!!!!!!!!!";
+        cout<<msg<<endl;
         exit(0);
     }
     /*

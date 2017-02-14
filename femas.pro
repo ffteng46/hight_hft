@@ -26,6 +26,9 @@ HEADERS += \
     XeleFtdcMduserApi.h \
     XeleMdFtdcUserApiDataType.h \
     XeleMdFtdcUserApiStruct.h \
-    DemoUtils.h
+    DemoUtils.h \
+    USTPFtdcTraderApi.h \
+    USTPFtdcUserApiDataType.h \
+    USTPFtdcUserApiStruct.h
 
 

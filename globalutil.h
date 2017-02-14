@@ -46,6 +46,8 @@ void recordRunningMsg(string msg);
 void OnRtnSHFEMarketData(CXeleShfeHighLevelOneMarketData *pDepthMarketData);
 string getCloseMethod();
 void initPriceGap();
+//query frequence
+void querySleep();
 // 定义64位整形
 #if defined(_WIN32) && !defined(CYGWIN)
 typedef __int64 int64_t;

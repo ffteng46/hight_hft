@@ -66,6 +66,10 @@ double settlementPrice = 10;
 string sep = ";";
 //保存交易数据
 int tradeInfo[1];
+void querySleep(){
+    sleep(1);
+}
+
 void logEngine(){
     //cout<<"启动进程"<<endl;
     cout<<boosttoolsnamespace::CBoostTools::gbktoutf8("启动进程")<<endl;
@@ -111,7 +115,7 @@ void marketdataEngine(){
                 continue;
             }
             info = getCurrentSystemTime()+" "+info;
-            //cout<<"行情日志："<<info<<";size="<<info.size()<<endl;
+            cout<<"行情日志："<<info<<";size="<<info.size()<<endl;
             info.copy(cw,info.size(),0);
             //cout<<"日志："<<cw<<";size="<<strlen(cw)<<endl;
             in<<cw<<endl;
@@ -207,6 +211,7 @@ string getCloseMethod(){
     return orderoffset;
 }
 void initPriceGap(){
+    cerr << "--->>> " << "initPriceGap"  << endl;
     //int gaps = 2*(max_price - min_price);
     double tmp_price = min_price;
     while(true){
@@ -214,10 +219,15 @@ void initPriceGap(){
             double down_gap = (tmp_price - min_price)*2;
             double up_gap = down_gap + 2*tick;
             vector<double> gap_list;
-            //gap_list.push_back();
-            gap_list[0] = down_gap;
-            gap_list[1] = up_gap;
+            gap_list.push_back(down_gap);
+            gap_list.push_back(up_gap);
+//            gap_list[0] = down_gap;
+//            gap_list[1] = up_gap;
             map_price_gap[tmp_price] = gap_list;
+            char c_tmp[100];
+            sprintf(c_tmp,"price=%f down=%f up=%f",tmp_price,gap_list[0],gap_list[1]);
+            cout<<c_tmp<<endl;
+            LOG(INFO) << c_tmp;
         }else{
             break;
         }
@@ -227,7 +237,7 @@ void initPriceGap(){
 
 void OnRtnSHFEMarketData(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
 {
-    cout<<"----------------------->"<<getCloseMethod()<<endl;
+    //cout<<"----------------------->"<<getCloseMethod()<<endl;
     //处理行情
     int64_t start_time = GetSysTimeMicros();
     auto chro_start_time = boost::chrono::high_resolution_clock::now();
@@ -237,7 +247,14 @@ void OnRtnSHFEMarketData(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
     strcpy(instrumentID,pDepthMarketData->Instrument);
     int com = strcmp(singleInstrument,instrumentID);
     if(com != 0){
+        //cout<<"want instrumentid="<<singleInstrument<<",actual instrumentid="<<instrumentID<<endl;
+        string msg;
+        char c_msg[300];
+        sprintf(c_msg,"want instrumentid=%s,actual instrumentid=%s",singleInstrument,instrumentID);
+        LOG(INFO)<<string(c_msg);
         return;
+    }else{
+        cout<<"actual instrumentid="<<instrumentID<<endl;
     }
     TXeleMdFtdcMillisecType UpdateMillisec = pDepthMarketData->UpdateMillisec;
     TXeleMdFtdcVolumeType Volume = pDepthMarketData->Volume;
@@ -257,9 +274,11 @@ void OnRtnSHFEMarketData(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
     //cant find
     if(map_price_gap.find(lastPrice) == map_price_gap.end()){
         string msg = "can not find map_price_gap item: price=" + boost::lexical_cast<string>(lastPrice);
-        LogMsg *logmsg = new LogMsg();
-        logmsg->setMsg(msg);
-        logqueue.push(logmsg);
+        cout<<msg<<endl;
+//        LogMsg *logmsg = new LogMsg();
+//        logmsg->setMsg(msg);
+//        logqueue.push(logmsg);
+        LOG(INFO)<<msg;
         return;
     }else{
         unordered_map<double,vector<double>>::iterator map_it = map_price_gap.find(lastPrice);
@@ -277,8 +296,10 @@ void OnRtnSHFEMarketData(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
     previous_price = lastPrice;
     if(last_gap == -1){
         last_gap = gap;
+        cout<<"init gap"<<endl;
         return;
     }else if(last_gap == gap){
+        cout<<"last_gap==gap"<<endl;
         return;
     }else if(last_gap < gap){
         down_culculate = 0;
@@ -291,6 +312,10 @@ void OnRtnSHFEMarketData(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
     char char_orderoffset[3]={'\0'};
     string orderoffset;
     last_gap = gap;
+    //
+    char c_upcul[5]={'\0'};
+    char c_downcul[5]={'\0'};
+    char c_price[20]={'\0'};
     if(up_culculate >= cul_times){
         //sell
         char char_orderdir[] = "1";
@@ -301,6 +326,14 @@ void OnRtnSHFEMarketData(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
             orderoffset = getCloseMethod();
         }
         strcpy(char_orderoffset,orderoffset.c_str());
+        cout<<"sell"<<endl;
+        char c_msg[300];
+        sprintf(c_upcul,"%d",up_culculate);
+        sprintf(c_downcul,"%d",down_culculate);
+        sprintf(c_price,"%d",max_price);
+        sprintf(c_msg,"order: instrumentid=%s,direction=%s,offsetflag=%s,price=%s,up_culculate=%s,down_culculate=%s",
+                singleInstrument,char_orderdir,char_orderoffset,c_price,c_upcul,c_downcul);
+        LOG(INFO)<<string(c_msg);
         //pUserSpi->md_orderinsert(askPrice,char_orderdir,char_orderoffset,instrumentID,default_volume);
         pUserSpi->md_orderinsert(max_price,char_orderdir,char_orderoffset,instrumentID,default_volume);
     }else if(down_culculate >= cul_times){
@@ -313,6 +346,14 @@ void OnRtnSHFEMarketData(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
             orderoffset = getCloseMethod();
         }
         strcpy(char_orderoffset,orderoffset.c_str());
+        cout<<"buy"<<endl;
+        char c_msg[300];
+        sprintf(c_upcul,"%d",up_culculate);
+        sprintf(c_downcul,"%d",down_culculate);
+        sprintf(c_price,"%d",max_price);
+        sprintf(c_msg,"order: instrumentid=%s,direction=%s,offsetflag=%s,price=%s,up_culculate=%s,down_culculate=%s",
+                singleInstrument,char_orderdir,char_orderoffset,c_price,c_upcul,c_downcul);
+        LOG(INFO)<<string(c_msg);
        // pUserSpi->md_orderinsert(bidPrice,char_orderdir,char_orderoffset,instrumentID,default_volume);
         pUserSpi->md_orderinsert(min_price,char_orderdir,char_orderoffset,instrumentID,default_volume);
     }
@@ -341,7 +382,7 @@ void OnRtnSHFEMarketData(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
     marketdata.append(sep);
     ss.clear();
     ///申买量一
-    char char_bv1[20] = {'\0'};
+    char char_bv1[30] = {'\0'};
     sprintf(char_bv1,"%d",pDepthMarketData->BidVolume);
     marketdata.append("BidVolume1=");
     marketdata.append(char_bv1);
@@ -355,7 +396,7 @@ void OnRtnSHFEMarketData(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
     marketdata.append(sep);
     ss.clear();
     ///申卖量一
-    char char_sv1[20] = {'\0'};
+    char char_sv1[30] = {'\0'};
     sprintf(char_sv1,"%d",pDepthMarketData->AskVolume);
     marketdata.append("AskVolume1=");
     marketdata.append(char_sv1);
@@ -372,14 +413,14 @@ void OnRtnSHFEMarketData(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
     marketdata.append(sep);
     ///数量
 //    TUstpFtdcVolumeType	Volume = pDepthMarketData->Volume;
-    char char_vol[20] = {'\0'};
+    char char_vol[30] = {'\0'};
     sprintf(char_vol,"%d",Volume);
     marketdata.append("Volume=");
     marketdata.append(char_vol);
     marketdata.append(sep);
     ///持仓量
 //    TUstpFtdcLargeVolumeType	OpenInterest = pDepthMarketData->OpenInterest;
-    char char_opi[20] = {'\0'};
+    char char_opi[30] = {'\0'};
     sprintf(char_opi,"%d",OpenInterest);
     marketdata.append("OpenInterest=");
     marketdata.append(char_opi);
@@ -388,7 +429,7 @@ void OnRtnSHFEMarketData(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
 
     ///最后修改毫秒
 //    TUstpFtdcMillisecType	UpdateMillisec = pDepthMarketData->UpdateMillisec;
-    char char_ums[20] = {'\0'};
+    char char_ums[30] = {'\0'};
     sprintf(char_ums,"%d",UpdateMillisec);
     marketdata.append("UpdateMillisec=");
     marketdata.append(char_ums);

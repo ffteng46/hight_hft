@@ -1,4 +1,4 @@
-﻿// TraderSpi.cpp: implementation of the CTraderSpi class.
+// TraderSpi.cpp: implementation of the CTraderSpi class.
 //
 //////////////////////////////////////////////////////////////////////
 
@@ -68,6 +68,7 @@ CTraderSpi::~CTraderSpi()
 //记录时间
 int CTraderSpi::md_orderinsert(double price,char *dir,char *offset,char * ins,int ordervolume){
     TUstpFtdcUserOrderLocalIDType UserOrderLocalID;
+    cout<<"1"<<endl;
     char InstrumentID[31];
     strcpy(InstrumentID,ins);
     char Direction[2];
@@ -82,9 +83,9 @@ int CTraderSpi::md_orderinsert(double price,char *dir,char *offset,char * ins,in
     //开仓手数
     int Volume = ordervolume;
     //报单引用编号
-    sprintf(UserOrderLocalID,"%d",g_nOrdLocalID);
+    sprintf(UserOrderLocalID,"%d",++g_nOrdLocalID);
     //cout<<"------->"<<ORDER_REF<<endl;
-    g_nOrdLocalID++;
+    //g_nOrdLocalID++;
     //报单结构体
     CUstpFtdcInputOrderField req;
     ///经纪公司代码
@@ -159,6 +160,7 @@ int CTraderSpi::md_orderinsert(double price,char *dir,char *offset,char * ins,in
 //    tmpmap["ist_time"] = ist_time;
 //    seq_map_g_nOrdLocalID[str_osk] = tmpmap;
     //委托类操作，使用客户端定义的请求编号格式
+    cout<<"order"<<endl;
     int iResult = pUserApi->ReqOrderInsert(&req,nRequestID);
     cerr << "--->>> ReqOrderInsert:" << ((iResult == 0) ? "success" : "failed") << endl;
 //    string msg = "order_requestid=" + string(char_order_index) + ";orderinsert_requestid=" + string(char_query_index);
@@ -185,7 +187,7 @@ void CTraderSpi::ReqUserLogin()
     string msg=string(char_msg);
     LOG(INFO)<<msg;
     cout << "BROKER_ID:"<< BROKER_ID<<";INVESTOR_ID:"<<INVESTOR_ID<<";PASSWORD="<<PASSWORD <<endl;
-
+    querySleep();
     cerr << "hello" <<endl;
     CUstpFtdcReqUserLoginField reqUserLogin;
     memset(&reqUserLogin,0,sizeof(CUstpFtdcReqUserLoginField));
@@ -263,14 +265,16 @@ void CTraderSpi::OnRspUserLogin(CUstpFtdcRspUserLoginField *pRspUserLogin, CUstp
 }
 void CTraderSpi::ReqQryInvestorPosition()
 {
+    querySleep();
     CUstpFtdcQryInvestorPositionField req;
     memset(&req, 0, sizeof(req));
     strcpy(req.BrokerID, BROKER_ID);
     strcpy(req.InvestorID, INVESTOR_ID);
     //strcpy(req.InstrumentID, INSTRUMENT_ID);
     int iResult = pUserApi->ReqQryInvestorPosition(&req, ++g_nOrdLocalID);
-
-    cerr << "--->>> 请求查询投资者持仓: " << ((iResult == 0) ? "成功" : "失败") << endl;
+    char char_rst[10] = {'\0'};
+    sprintf(char_rst,"%d",iResult);
+    cerr << "--->>> 请求查询投资者持仓: " << ((iResult == 0) ? "成功" : "失败")<<",result="<<char_rst << endl;
     //发送请求日志
     char char_msg[1024];
     sprintf(char_msg, "--->>> 发送请求查询投资者持仓: %s", ((iResult == 0) ? "成功" : "失败"));
@@ -290,18 +294,22 @@ void CTraderSpi::OnRspQryInvestorPosition(CUstpFtdcRspInvestorPositionField *pRs
 
         int isbeginmk = 0;
         unordered_map<string,unordered_map<string,int>>::iterator tmpit = positionmap.begin();
-        for(;tmpit != positionmap.end();tmpit ++){
-            string str_instrument = tmpit->first;
-            unordered_map<string,int> tmppst = tmpit->second;
-            int longpst = tmppst["longTotalPosition"];
-            int shortpst = tmppst["shortTotalPosition"];
-            char char_longpst[12] = {'\0'};
-            char char_shortpst[12] = {'\0'};
-            sprintf(char_longpst,"%d",longpst);
-            sprintf(char_shortpst,"%d",shortpst);
-            string pst_msg = "持仓结构:"+str_instrument + ",多头持仓量=" + string(char_longpst) + ",空头持仓量=" + string(char_shortpst) ;
-            cout<<pst_msg<<endl;
-            LOG(INFO)<<pst_msg;
+        if(tmpit == positionmap.end()){
+            cout<<"当前无持仓信息"<<endl;
+        }else{
+            for(;tmpit != positionmap.end();tmpit ++){
+                string str_instrument = tmpit->first;
+                unordered_map<string,int> tmppst = tmpit->second;
+                int longpst = tmppst["longTotalPosition"];
+                int shortpst = tmppst["shortTotalPosition"];
+                char char_longpst[12] = {'\0'};
+                char char_shortpst[12] = {'\0'};
+                sprintf(char_longpst,"%d",longpst);
+                sprintf(char_shortpst,"%d",shortpst);
+                string pst_msg = "持仓结构:"+str_instrument + ",多头持仓量=" + string(char_longpst) + ",空头持仓量=" + string(char_shortpst) ;
+                cout<<pst_msg<<endl;
+                LOG(INFO)<<pst_msg;
+            }
         }
         cout<<"是否启动策略程序?0 否，1是"<<endl;
         cin>>isbeginmk;
@@ -455,9 +463,12 @@ void CTraderSpi::ReqQryInstrument(char *instrumentid)
     CUstpFtdcQryInstrumentField req;
     memset(&req, 0, sizeof(req));
     strcpy(req.InstrumentID, instrumentid);
-    strcpy(req.ExchangeID,"SHFE");
+    //strcpy(req.ExchangeID,"SHFE");
     int iResult = pUserApi->ReqQryInstrument(&req, ++g_nOrdLocalID);
-    cerr << "--->>> 请求查询合约: " << ((iResult == 0) ? "成功" : "失败") << endl;
+    char char_rst[10] = {'\0'};
+    sprintf(char_rst,"%d",iResult);
+    cerr << "--->>> 请求查询合约: " << ((iResult == 0) ? "成功" : "失败") <<",result="<<char_rst<< endl;
+    querySleep();
     ReqQryInvestorPosition();
 }
 void CTraderSpi::Show(CUstpFtdcOrderField *pOrder)
@@ -764,13 +775,14 @@ void CTraderSpi::OnRspQryInstrument(CUstpFtdcRspInstrumentField *pRspInstrument,
 		printf("没有查询到合约数据\n");
 		return ;
     }else{
+        Show(pRspInstrument);
         tick = pRspInstrument->PriceTick;
         min_price = pRspInstrument->LowerLimitPrice;
         max_price = pRspInstrument->UpperLimitPrice;
         ReqQryInvestorPosition();
     }
 	
-//	Show(pRspInstrument);
+
 //	return ;
 }
 
@@ -919,44 +931,44 @@ void CTraderSpi::OnRtnInstrumentStatus(CUstpFtdcInstrumentStatusField *pInstrume
 	}
 	icount++;
 	
-	printf("-----------------------------\n");
-	printf("交易所代码=[%s]\n",pInstrumentStatus->ExchangeID);
-	printf("品种代码=[%s]\n",pInstrumentStatus->ProductID);
-	printf("品种名称=[%s]\n",pInstrumentStatus->ProductName);
-	printf("合约代码=[%s]\n",pInstrumentStatus->InstrumentID);
-	printf("合约名称=[%s]\n",pInstrumentStatus->InstrumentName);
-	printf("交割年份=[%d]\n",pInstrumentStatus->DeliveryYear);
-	printf("交割月=[%d]\n",pInstrumentStatus->DeliveryMonth);
-	printf("限价单最大下单量=[%d]\n",pInstrumentStatus->MaxLimitOrderVolume);
-	printf("限价单最小下单量=[%d]\n",pInstrumentStatus->MinLimitOrderVolume);
-	printf("市价单最大下单量=[%d]\n",pInstrumentStatus->MaxMarketOrderVolume);
-	printf("市价单最小下单量=[%d]\n",pInstrumentStatus->MinMarketOrderVolume);
+//	printf("-----------------------------\n");
+//	printf("交易所代码=[%s]\n",pInstrumentStatus->ExchangeID);
+//	printf("品种代码=[%s]\n",pInstrumentStatus->ProductID);
+//	printf("品种名称=[%s]\n",pInstrumentStatus->ProductName);
+//	printf("合约代码=[%s]\n",pInstrumentStatus->InstrumentID);
+//	printf("合约名称=[%s]\n",pInstrumentStatus->InstrumentName);
+//	printf("交割年份=[%d]\n",pInstrumentStatus->DeliveryYear);
+//	printf("交割月=[%d]\n",pInstrumentStatus->DeliveryMonth);
+//	printf("限价单最大下单量=[%d]\n",pInstrumentStatus->MaxLimitOrderVolume);
+//	printf("限价单最小下单量=[%d]\n",pInstrumentStatus->MinLimitOrderVolume);
+//	printf("市价单最大下单量=[%d]\n",pInstrumentStatus->MaxMarketOrderVolume);
+//	printf("市价单最小下单量=[%d]\n",pInstrumentStatus->MinMarketOrderVolume);
 	
-	printf("数量乘数=[%d]\n",pInstrumentStatus->VolumeMultiple);
-	printf("报价单位=[%lf]\n",pInstrumentStatus->PriceTick);
-	printf("币种=[%c]\n",pInstrumentStatus->Currency);
-	printf("多头限仓=[%d]\n",pInstrumentStatus->LongPosLimit);
-	printf("空头限仓=[%d]\n",pInstrumentStatus->ShortPosLimit);
-	printf("跌停板价=[%lf]\n",pInstrumentStatus->LowerLimitPrice);
-	printf("涨停板价=[%lf]\n",pInstrumentStatus->UpperLimitPrice);
-	printf("昨结算=[%lf]\n",pInstrumentStatus->PreSettlementPrice);
-	printf("合约交易状态=[%c]\n",pInstrumentStatus->InstrumentStatus);
+//	printf("数量乘数=[%d]\n",pInstrumentStatus->VolumeMultiple);
+//	printf("报价单位=[%lf]\n",pInstrumentStatus->PriceTick);
+//	printf("币种=[%c]\n",pInstrumentStatus->Currency);
+//	printf("多头限仓=[%d]\n",pInstrumentStatus->LongPosLimit);
+//	printf("空头限仓=[%d]\n",pInstrumentStatus->ShortPosLimit);
+//	printf("跌停板价=[%lf]\n",pInstrumentStatus->LowerLimitPrice);
+//	printf("涨停板价=[%lf]\n",pInstrumentStatus->UpperLimitPrice);
+//	printf("昨结算=[%lf]\n",pInstrumentStatus->PreSettlementPrice);
+//	printf("合约交易状态=[%c]\n",pInstrumentStatus->InstrumentStatus);
 	
-	printf("创建日=[%s]\n",pInstrumentStatus->CreateDate);
-	printf("上市日=[%s]\n",pInstrumentStatus->OpenDate);
-	printf("到期日=[%s]\n",pInstrumentStatus->ExpireDate);
-	printf("开始交割日=[%s]\n",pInstrumentStatus->StartDelivDate);
-	printf("最后交割日=[%s]\n",pInstrumentStatus->EndDelivDate);
-	printf("挂牌基准价=[%lf]\n",pInstrumentStatus->BasisPrice);
-	printf("当前是否交易=[%d]\n",pInstrumentStatus->IsTrading);
-	printf("基础商品代码=[%s]\n",pInstrumentStatus->UnderlyingInstrID);
-	printf("持仓类型=[%c]\n",pInstrumentStatus->PositionType);
-	printf("执行价=[%lf]\n",pInstrumentStatus->StrikePrice);
-	printf("期权类型=[%c]\n",pInstrumentStatus->OptionsType);
+//	printf("创建日=[%s]\n",pInstrumentStatus->CreateDate);
+//	printf("上市日=[%s]\n",pInstrumentStatus->OpenDate);
+//	printf("到期日=[%s]\n",pInstrumentStatus->ExpireDate);
+//	printf("开始交割日=[%s]\n",pInstrumentStatus->StartDelivDate);
+//	printf("最后交割日=[%s]\n",pInstrumentStatus->EndDelivDate);
+//	printf("挂牌基准价=[%lf]\n",pInstrumentStatus->BasisPrice);
+//	printf("当前是否交易=[%d]\n",pInstrumentStatus->IsTrading);
+//	printf("基础商品代码=[%s]\n",pInstrumentStatus->UnderlyingInstrID);
+//	printf("持仓类型=[%c]\n",pInstrumentStatus->PositionType);
+//	printf("执行价=[%lf]\n",pInstrumentStatus->StrikePrice);
+//	printf("期权类型=[%c]\n",pInstrumentStatus->OptionsType);
 
-	printf("-----------------------------\n");
-	printf("[%d]",icount);
-	return ;
+//	printf("-----------------------------\n");
+//	printf("[%d]",icount);
+//	return ;
 
 }
 
@@ -1056,7 +1068,7 @@ bool CTraderSpi::IsErrorRspInfo(CUstpFtdcRspInfoField *pRspInfo)
 {
     // 如果ErrorID != 0, 说明收到了错误的响应
     bool bResult = ((pRspInfo) && (pRspInfo->ErrorID != 0));
-    cout<<"iserror"<<bResult<<" "<< pRspInfo<<endl;
+   // cout<<"iserror"<<bResult<<" "<< pRspInfo<<endl;
 //    string errmsg = boosttoolsnamespace::CBoostTools::gbktoutf8(pRspInfo->ErrorMsg);
 
     char char_msg[1024]={'\0'};

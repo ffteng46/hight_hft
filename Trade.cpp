@@ -1,4 +1,4 @@
-﻿// testTraderApi.cpp : 定义控制台应用程序的入口点。
+// testTraderApi.cpp : 定义控制台应用程序的入口点。
 //
 #include "PublicFuncs.h"
 #include "TraderSpi.h"
@@ -93,7 +93,7 @@ void TradeProcess::startTrade()
 {
     //readInsList();
     datainit();
-
+    //initPriceGap();
     string str = boosttoolsnamespace::CBoostTools::gbktoutf8("经纪公司代码");
     cout<<str<<endl;
     cout<<"经纪公司代码="<<BROKER_ID<<endl;
