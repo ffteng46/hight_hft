@@ -330,7 +330,7 @@ void OnRtnSHFEMarketData(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
         char c_msg[300];
         sprintf(c_upcul,"%d",up_culculate);
         sprintf(c_downcul,"%d",down_culculate);
-        sprintf(c_price,"%d",max_price);
+        sprintf(c_price,"%f",max_price);
         sprintf(c_msg,"order: instrumentid=%s,direction=%s,offsetflag=%s,price=%s,up_culculate=%s,down_culculate=%s",
                 singleInstrument,char_orderdir,char_orderoffset,c_price,c_upcul,c_downcul);
         LOG(INFO)<<string(c_msg);
@@ -350,7 +350,7 @@ void OnRtnSHFEMarketData(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
         char c_msg[300];
         sprintf(c_upcul,"%d",up_culculate);
         sprintf(c_downcul,"%d",down_culculate);
-        sprintf(c_price,"%d",max_price);
+        sprintf(c_price,"%f",max_price);
         sprintf(c_msg,"order: instrumentid=%s,direction=%s,offsetflag=%s,price=%s,up_culculate=%s,down_culculate=%s",
                 singleInstrument,char_orderdir,char_orderoffset,c_price,c_upcul,c_downcul);
         LOG(INFO)<<string(c_msg);

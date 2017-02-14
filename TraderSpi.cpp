@@ -1,4 +1,4 @@
-// TraderSpi.cpp: implementation of the CTraderSpi class.
+﻿// TraderSpi.cpp: implementation of the CTraderSpi class.
 //
 //////////////////////////////////////////////////////////////////////
 
@@ -85,6 +85,7 @@ int CTraderSpi::md_orderinsert(double price,char *dir,char *offset,char * ins,in
     //报单引用编号
     sprintf(UserOrderLocalID,"%d",++g_nOrdLocalID);
     //cout<<"------->"<<ORDER_REF<<endl;
+    cout<<"2"<<endl;
     //g_nOrdLocalID++;
     //报单结构体
     CUstpFtdcInputOrderField req;
@@ -97,20 +98,29 @@ int CTraderSpi::md_orderinsert(double price,char *dir,char *offset,char * ins,in
     strcpy(req.InstrumentID, InstrumentID);
     ///报单引用
     strcpy(req.UserOrderLocalID, UserOrderLocalID);
-
+    cout<<"3"<<endl;
     ///用户代码
     //	TUstpFtdcUserIDType	UserID;
     strcpy(req.UserID,INVESTOR_ID);
+    cout<<"31"<<endl;
     ///报单价格条件: 限价
     req.OrderPriceType = USTP_FTDC_OPT_LimitPrice;
     ///买卖方向:
-    strcpy(&req.Direction,dir);
+    ///
+//    strcpy(&req.Direction,dir);
+    req.Direction = dir[0];
+    cout<<"32"<<endl;
     ///组合开平标志: 开仓
-    strcpy(&req.OffsetFlag ,offset);
+    //strcpy(&req.OffsetFlag ,offset);
+    req.OffsetFlag = offset[0];
+    cout<<"33"<<endl;
     ///组合投机套保标志
     strcpy(&req.HedgeFlag,HedgeFlag);
+    req.HedgeFlag = HedgeFlag[0];
+    cout<<"34"<<endl;
     ///价格
     req.LimitPrice = Price;
+    cout<<"4"<<endl;
     ///数量: 1
     req.Volume = Volume;
     ///有效期类型: 当日有效
@@ -129,6 +139,7 @@ int CTraderSpi::md_orderinsert(double price,char *dir,char *offset,char * ins,in
     //req.ContingentCondition = THOST_FTDC_CC_Immediately;
     ///止损价
     //TUstpFtdcPriceType	StopPrice;
+    cout<<"5"<<endl;
     req.StopPrice = 0;
     ///强平原因: 非强平
     req.ForceCloseReason = USTP_FTDC_FCR_NotForceClose;
@@ -142,7 +153,7 @@ int CTraderSpi::md_orderinsert(double price,char *dir,char *offset,char * ins,in
     ///用户强评标志: 否
     //req.UserForceClose = 0;///经纪公司代码
     //
-
+    cout<<"6"<<endl;
     int nRequestID = ++iRequestID;
 //    char char_order_index[10]={'\0'};
 //    sprintf(char_order_index,"%d",nRequestID);
