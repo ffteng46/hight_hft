@@ -1,4 +1,4 @@
-﻿// TraderSpi.cpp: implementation of the CTraderSpi class.
+// TraderSpi.cpp: implementation of the CTraderSpi class.
 //
 //////////////////////////////////////////////////////////////////////
 
@@ -68,9 +68,9 @@ CTraderSpi::~CTraderSpi()
 //记录时间
 int CTraderSpi::md_orderinsert(double price,char *dir,char *offset,char * ins,int ordervolume){
     TUstpFtdcUserOrderLocalIDType UserOrderLocalID;
-    cout<<"1"<<endl;
-    char InstrumentID[31];
-    strcpy(InstrumentID,ins);
+   // cout<<"1"<<endl;
+//    char InstrumentID[31];
+//    strcpy(InstrumentID,ins);
     char Direction[2];
     strcpy(Direction,dir);
     ///投机 '1';套保'3'
@@ -85,7 +85,7 @@ int CTraderSpi::md_orderinsert(double price,char *dir,char *offset,char * ins,in
     //报单引用编号
     sprintf(UserOrderLocalID,"%d",++g_nOrdLocalID);
     //cout<<"------->"<<ORDER_REF<<endl;
-    cout<<"2"<<endl;
+    //cout<<"2"<<endl;
     //g_nOrdLocalID++;
     //报单结构体
     CUstpFtdcInputOrderField req;
@@ -95,32 +95,34 @@ int CTraderSpi::md_orderinsert(double price,char *dir,char *offset,char * ins,in
     strcpy(req.InvestorID, INVESTOR_ID);
     ///合约代码// UserApi对象
     //CUstpFtdcTraderApi* pUserApi;
-    strcpy(req.InstrumentID, InstrumentID);
+    strcpy(req.InstrumentID, ins);
+    cout<<"instrumentid="<<string(req.InstrumentID)<<endl;
     ///报单引用
     strcpy(req.UserOrderLocalID, UserOrderLocalID);
-    cout<<"3"<<endl;
+   // cout<<"3"<<endl;
     ///用户代码
     //	TUstpFtdcUserIDType	UserID;
     strcpy(req.UserID,INVESTOR_ID);
-    cout<<"31"<<endl;
+    //cout<<"31"<<endl;
     ///报单价格条件: 限价
     req.OrderPriceType = USTP_FTDC_OPT_LimitPrice;
     ///买卖方向:
     ///
 //    strcpy(&req.Direction,dir);
     req.Direction = dir[0];
-    cout<<"32"<<endl;
+    //cout<<"32"<<endl;
     ///组合开平标志: 开仓
     //strcpy(&req.OffsetFlag ,offset);
     req.OffsetFlag = offset[0];
-    cout<<"33"<<endl;
+    //cout<<"33"<<endl;
     ///组合投机套保标志
-    strcpy(&req.HedgeFlag,HedgeFlag);
+    //strcpy(&req.HedgeFlag,HedgeFlag);
     req.HedgeFlag = HedgeFlag[0];
-    cout<<"34"<<endl;
+    //cout<<"34"<<endl;
     ///价格
     req.LimitPrice = Price;
-    cout<<"4"<<endl;
+    //cout<<"4"<<endl;
+    strcpy(req.ExchangeID,"SHFE");
     ///数量: 1
     req.Volume = Volume;
     ///有效期类型: 当日有效
@@ -139,7 +141,7 @@ int CTraderSpi::md_orderinsert(double price,char *dir,char *offset,char * ins,in
     //req.ContingentCondition = THOST_FTDC_CC_Immediately;
     ///止损价
     //TUstpFtdcPriceType	StopPrice;
-    cout<<"5"<<endl;
+    //cout<<"5"<<endl;
     req.StopPrice = 0;
     ///强平原因: 非强平
     req.ForceCloseReason = USTP_FTDC_FCR_NotForceClose;
@@ -153,7 +155,8 @@ int CTraderSpi::md_orderinsert(double price,char *dir,char *offset,char * ins,in
     ///用户强评标志: 否
     //req.UserForceClose = 0;///经纪公司代码
     //
-    cout<<"6"<<endl;
+    //cout<<"6"<<endl;
+    //Show(req);
     int nRequestID = ++iRequestID;
 //    char char_order_index[10]={'\0'};
 //    sprintf(char_order_index,"%d",nRequestID);
@@ -343,6 +346,7 @@ void CTraderSpi::OnRspOrderInsert(CUstpFtdcInputOrderField *pInputOrder, CUstpFt
     {
         //cerr << "--->>> " << "OnRspOrderInsert" << "响应请求编号："<<nRequestID<< " CTP回报请求编号"<<pInputOrder->RequestID<<endl;
         string sInputOrderInfo = getInvestorOrderInsertInfo(pInputOrder);
+        cout<<sInputOrderInfo<<endl;
         string sResult;
         char cErrorID[10]={'\0'};
         sprintf(cErrorID,"%d",pRspInfo->ErrorID);
@@ -1518,12 +1522,12 @@ string CTraderSpi::getInvestorOrderInsertInfo(CUstpFtdcInputOrderField *order)
     ordreInfo.append("InstrumentID=").append(InstrumentID);ordreInfo.append("\t");
     ordreInfo.append("UserOrderLocalID=").append(UserOrderLocalID);ordreInfo.append("\t");
     ordreInfo.append("UserID=").append(UserID);ordreInfo.append("\t");
-    ordreInfo.append("Direction").append(Direction);ordreInfo.append("\t");
-    ordreInfo.append("CombOffsetFlag").append(CombOffsetFlag);ordreInfo.append("\t");
-    ordreInfo.append("CombHedgeFlag").append(CombHedgeFlag);ordreInfo.append("\t");
-    ordreInfo.append("LimitPrice").append(LimitPrice);ordreInfo.append("\t");
-    ordreInfo.append("VolumeTotalOriginal").append(VolumeTotalOriginal);ordreInfo.append("\t");
-    ordreInfo.append("VolumeCondition").append(VolumeCondition);ordreInfo.append("\t");
+    ordreInfo.append("Direction=").append(Direction);ordreInfo.append("\t");
+    ordreInfo.append("CombOffsetFlag=").append(CombOffsetFlag);ordreInfo.append("\t");
+    ordreInfo.append("CombHedgeFlag=").append(CombHedgeFlag);ordreInfo.append("\t");
+    ordreInfo.append("LimitPrice=").append(LimitPrice);ordreInfo.append("\t");
+    ordreInfo.append("VolumeTotalOriginal=").append(VolumeTotalOriginal);ordreInfo.append("\t");
+    ordreInfo.append("VolumeCondition=").append(VolumeCondition);ordreInfo.append("\t");
 //    ordreInfo.append("RequestID").append(RequestID);ordreInfo.append("\t");
     return ordreInfo;
 }

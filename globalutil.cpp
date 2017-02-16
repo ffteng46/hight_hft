@@ -254,11 +254,21 @@ void OnRtnSHFEMarketData(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
         LOG(INFO)<<string(c_msg);
         return;
     }else{
-        cout<<"actual instrumentid="<<instrumentID<<endl;
+        char c_p[20];
+        sprintf(c_p,"%f",pDepthMarketData->LastPrice);
+        cout<<"actual instrumentid="<<instrumentID<<",price="<<string(c_p)<<endl;
     }
     TXeleMdFtdcMillisecType UpdateMillisec = pDepthMarketData->UpdateMillisec;
     TXeleMdFtdcVolumeType Volume = pDepthMarketData->Volume;
     TXeleMdFtdcPriceType lastPrice = pDepthMarketData->LastPrice;
+    char buf[10];
+    sprintf(buf, "%.2f", lastPrice);
+    sscanf(buf, "%lf", &lastPrice);
+//    unsigned char s[20];
+////    double dRetval;
+
+//    sprintf(s,"%.*lf",2,lastPrice);
+//    sscanf(s,"%lf",&lastPrice);
     TXeleMdFtdcMoneyType Turnover = pDepthMarketData->Turnover;
     TXeleMdFtdcLargeVolumeType OpenInterest = pDepthMarketData->OpenInterest;
     TXeleMdFtdcPriceType bidPrice = pDepthMarketData->BidPrice;
@@ -293,6 +303,17 @@ void OnRtnSHFEMarketData(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
         previous_price = lastPrice;
         return;
     }
+    char c_lastp[20];
+    sprintf(c_lastp,"%f",lastPrice);
+    char c_pre_p[20];
+    sprintf(c_pre_p,"%f",previous_price);
+    char c_cur_gap[20];
+    sprintf(c_cur_gap,"%f",gap);
+    char c_last_gap[20];
+    sprintf(c_last_gap,"%f",last_gap);
+    char tmp_msg[256];
+    sprintf(tmp_msg,"currPrice=%s,prePrice=%s,currGap=%s,lastGap=%s",c_lastp,c_pre_p,c_cur_gap,c_last_gap);
+    cout<<tmp_msg<<endl;
     previous_price = lastPrice;
     if(last_gap == -1){
         last_gap = gap;
