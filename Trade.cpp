@@ -1,4 +1,4 @@
-// testTraderApi.cpp : 定义控制台应用程序的入口点。
+﻿// testTraderApi.cpp : 定义控制台应用程序的入口点。
 //
 #include "PublicFuncs.h"
 #include "TraderSpi.h"
@@ -239,10 +239,21 @@ void TradeProcess::tradeinit(){
 //    pUserApi->Join();
 
 }
+void create(){
+    while(true){
+        sleep(1);
+        LogMsg *logmsg = new LogMsg();
+        logmsg->setMsg("msg");
+        mkdataqueue.push(logmsg);
+    }
+
+}
+
 void TradeProcess::initThread(int sendtype)
 {
     printf("经纪公司编号=[%s]\n","pInvestorMargin->BrokerID");
     thread_log_group.create_thread(marketdataEngine);
+    //thread_log_group.create_thread(create);
 //    thread_log_group.create_thread(test);
     //thread_log_group.create_thread(marketdataEngine);
     //thread_log_group.join_all();

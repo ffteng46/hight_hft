@@ -115,7 +115,7 @@ void marketdataEngine(){
                 continue;
             }
             info = getCurrentSystemTime()+" "+info;
-            cout<<"行情日志："<<info<<";size="<<info.size()<<endl;
+            //cout<<"行情日志："<<info<<";size="<<info.size()<<endl;
             info.copy(cw,info.size(),0);
             //cout<<"日志："<<cw<<";size="<<strlen(cw)<<endl;
             in<<cw<<endl;
@@ -275,6 +275,86 @@ void OnRtnSHFEMarketData(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
     TXeleMdFtdcPriceType askPrice = pDepthMarketData->AskPrice;
 //    TXeleMdFtdcVolumeType BidVolume = pDepthMarketData->BidVolume;
 //    TXeleMdFtdcVolumeType AskVolume = pDepthMarketData->AskVolume;
+    ///最后修改时间
+    TXeleMdFtdcTimeType UpdateTime;
+    strcpy(UpdateTime, pDepthMarketData->UpdateTime);
+    marketdata.append("UpdateTime=");
+    marketdata.append(pDepthMarketData->UpdateTime);
+    marketdata.append(sep);
+    ///申买价一
+    marketdata.append("BidPrice1=");
+    ss << pDepthMarketData->BidPrice;
+    string BidPrice1;
+    ss >> BidPrice1;
+    marketdata.append(BidPrice1);
+    marketdata.append(sep);
+    ss.clear();
+    ///申买量一
+    char char_bv1[30] = {'\0'};
+    sprintf(char_bv1,"%d",pDepthMarketData->BidVolume);
+    marketdata.append("BidVolume1=");
+    marketdata.append(char_bv1);
+    marketdata.append(sep);
+    ///申卖价一
+    marketdata.append("AskPrice1=");
+    ss << pDepthMarketData->AskPrice;
+    string AskPrice1;
+    ss >> AskPrice1;
+    marketdata.append(AskPrice1);
+    marketdata.append(sep);
+    ss.clear();
+    ///申卖量一
+    char char_sv1[30] = {'\0'};
+    sprintf(char_sv1,"%d",pDepthMarketData->AskVolume);
+    marketdata.append("AskVolume1=");
+    marketdata.append(char_sv1);
+    marketdata.append(sep);
+    marketdata.append("InstrumentID=");
+    marketdata.append(instrumentID);
+    marketdata.append(sep);
+    ///最新价
+    marketdata.append("LastPrice=");
+    ss << pDepthMarketData->LastPrice;
+    string lastprice;
+    ss >> lastprice;
+    marketdata.append(lastprice);
+    marketdata.append(sep);
+    ///数量
+//    TUstpFtdcVolumeType	Volume = pDepthMarketData->Volume;
+    char char_vol[30] = {'\0'};
+    sprintf(char_vol,"%d",Volume);
+    marketdata.append("Volume=");
+    marketdata.append(char_vol);
+    marketdata.append(sep);
+    ///持仓量
+//    TUstpFtdcLargeVolumeType	OpenInterest = pDepthMarketData->OpenInterest;
+    char char_opi[30] = {'\0'};
+    sprintf(char_opi,"%d",OpenInterest);
+    marketdata.append("OpenInterest=");
+    marketdata.append(char_opi);
+    marketdata.append(sep);
+
+
+    ///最后修改毫秒
+//    TUstpFtdcMillisecType	UpdateMillisec = pDepthMarketData->UpdateMillisec;
+    char char_ums[30] = {'\0'};
+    sprintf(char_ums,"%d",UpdateMillisec);
+    marketdata.append("UpdateMillisec=");
+    marketdata.append(char_ums);
+    marketdata.append(sep);
+    ///当日均价
+    marketdata.append("turnover=");
+    ss << Turnover;
+    string str_Turnover;
+    ss >> str_Turnover;
+    marketdata.append(str_Turnover);
+    marketdata.append(sep);
+    ss.clear();
+    LogMsg *logmsg = new LogMsg();
+    logmsg->setMsg(marketdata);
+    mkdataqueue.push(logmsg);
+
+
 
     if(previous_price == 0){
         previous_price = lastPrice;
@@ -388,84 +468,7 @@ void OnRtnSHFEMarketData(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
     logmsg.setMsg(msg);
     logqueue.push(&logmsg)*/;
 
-    ///最后修改时间
-    TXeleMdFtdcTimeType UpdateTime;
-    strcpy(UpdateTime, pDepthMarketData->UpdateTime);
-    marketdata.append("UpdateTime=");
-    marketdata.append(pDepthMarketData->UpdateTime);
-    marketdata.append(sep);
-    ///申买价一
-    marketdata.append("BidPrice1=");
-    ss << pDepthMarketData->BidPrice;
-    string BidPrice1;
-    ss >> BidPrice1;
-    marketdata.append(BidPrice1);
-    marketdata.append(sep);
-    ss.clear();
-    ///申买量一
-    char char_bv1[30] = {'\0'};
-    sprintf(char_bv1,"%d",pDepthMarketData->BidVolume);
-    marketdata.append("BidVolume1=");
-    marketdata.append(char_bv1);
-    marketdata.append(sep);
-    ///申卖价一
-    marketdata.append("AskPrice1=");
-    ss << pDepthMarketData->AskPrice;
-    string AskPrice1;
-    ss >> AskPrice1;
-    marketdata.append(AskPrice1);
-    marketdata.append(sep);
-    ss.clear();
-    ///申卖量一
-    char char_sv1[30] = {'\0'};
-    sprintf(char_sv1,"%d",pDepthMarketData->AskVolume);
-    marketdata.append("AskVolume1=");
-    marketdata.append(char_sv1);
-    marketdata.append(sep);
-    marketdata.append("InstrumentID=");
-    marketdata.append(instrumentID);
-    marketdata.append(sep);
-    ///最新价
-    marketdata.append("LastPrice=");
-    ss << pDepthMarketData->LastPrice;
-    string lastprice;
-    ss >> lastprice;
-    marketdata.append(lastprice);
-    marketdata.append(sep);
-    ///数量
-//    TUstpFtdcVolumeType	Volume = pDepthMarketData->Volume;
-    char char_vol[30] = {'\0'};
-    sprintf(char_vol,"%d",Volume);
-    marketdata.append("Volume=");
-    marketdata.append(char_vol);
-    marketdata.append(sep);
-    ///持仓量
-//    TUstpFtdcLargeVolumeType	OpenInterest = pDepthMarketData->OpenInterest;
-    char char_opi[30] = {'\0'};
-    sprintf(char_opi,"%d",OpenInterest);
-    marketdata.append("OpenInterest=");
-    marketdata.append(char_opi);
-    marketdata.append(sep);
 
-
-    ///最后修改毫秒
-//    TUstpFtdcMillisecType	UpdateMillisec = pDepthMarketData->UpdateMillisec;
-    char char_ums[30] = {'\0'};
-    sprintf(char_ums,"%d",UpdateMillisec);
-    marketdata.append("UpdateMillisec=");
-    marketdata.append(char_ums);
-    marketdata.append(sep);
-    ///当日均价
-    marketdata.append("turnover=");
-    ss << Turnover;
-    string str_Turnover;
-    ss >> str_Turnover;
-    marketdata.append(str_Turnover);
-    marketdata.append(sep);
-    ss.clear();
-    LogMsg *logmsg = new LogMsg();
-    logmsg->setMsg(msg);
-    mkdataqueue.push(logmsg);
 //    logmsg.setMsg(marketdata);
 //    mkdataqueue.push(&logmsg);
     //处理行情
