@@ -58,6 +58,7 @@ public:
 	void Show(CUstpFtdcRspInstrumentField *pRspInstrument);
 
 private:
+    void ReqInvestorAccount();
     ///请求查询合约
     void ReqQryInstrument(char *instrumentid);
     string getInvestorOrderInsertInfo(CUstpFtdcInputOrderField *order);

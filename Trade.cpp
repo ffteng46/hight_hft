@@ -79,10 +79,12 @@ char char_front_id[12] = {'\0'};
 char char_session_id[20] = {'\0'};
 string str_front_id;
 string str_sessioin_id;
+int isTest = 1;//1=real,2=test
 //longpstlimit
 int longpstlimit = 0;
 //shortpstlimit
 int shortpstlimit = 0;
+
 //g_nOrdLocalID对应关系
 unordered_map<string,unordered_map<string,int64_t>> seq_map_g_nOrdLocalID;
 //ordersysid对应关系
@@ -102,8 +104,8 @@ void TradeProcess::startTrade()
     cout<<"交易前置="<<FRONT_ADDR<<endl;
     cout<<"行情前置="<<MD_FRONT_ADDR<<endl;
     cout<<"报单触发信号="<<cul_times<<endl;
-//    cout<<"跌停价格="<<min_price<<endl;
-//    cout<<"涨停价格="<<max_price<<endl;
+    cout<<"shortpstlimit="<<shortpstlimit<<endl;
+    cout<<"longpstlimit="<<longpstlimit<<endl;
     cout<<"持仓预警值="<<pstalarm<<endl;
     cout<<"默认下单量="<<default_volume<<endl;
     cout<<"单一合约="<<singleInstrument<<endl;
@@ -167,14 +169,18 @@ void TradeProcess::datainit(){
                     strcpy(MD_FRONT_ADDR,vec[1].c_str());
                 }else if("cul_times"==vec[0]){
                     cul_times = boost::lexical_cast<int>(vec[1]);
+                }else if("isTest"==vec[0]){
+                    isTest = boost::lexical_cast<int>(vec[1]);
                 }else if("min_price"==vec[0]){
                     min_price = boost::lexical_cast<double>(vec[1]);
                 }else if("max_price"==vec[0]){
                     max_price = boost::lexical_cast<double>(vec[1]);
                 }else if("pstalarm"==vec[0]){
                     pstalarm = boost::lexical_cast<int>(vec[1]);
-                    longpstlimit = pstalarm;
-                    shortpstlimit = pstalarm;
+                }else if("longpstlimit"==vec[0]){
+                    longpstlimit = boost::lexical_cast<int>(vec[1]);
+                }else if("shortpstlimit"==vec[0]){
+                    shortpstlimit = boost::lexical_cast<int>(vec[1]);
                 }else if("instrumentList" == vec[0]){
                     /************************************************************************/
                     /* 如果读到      instrumentList，则保存到本程序中                                                               */
@@ -244,7 +250,7 @@ void create(){
         sleep(1);
         LogMsg *logmsg = new LogMsg();
         logmsg->setMsg("msg");
-        mkdataqueue.push(logmsg);
+        logqueue.push(logmsg);
     }
 
 }
@@ -253,6 +259,7 @@ void TradeProcess::initThread(int sendtype)
 {
     printf("经纪公司编号=[%s]\n","pInvestorMargin->BrokerID");
     thread_log_group.create_thread(marketdataEngine);
+    thread_log_group.create_thread(logEngine);
     //thread_log_group.create_thread(create);
 //    thread_log_group.create_thread(test);
     //thread_log_group.create_thread(marketdataEngine);

@@ -32,6 +32,7 @@ extern double min_price;
 extern double max_price;
 // UserApi对象
 extern CTraderSpi* pUserSpi;
+extern int isTest;
 //gap list map
 unordered_map<double,vector<double>> map_price_gap;
 extern char singleInstrument[30];
@@ -61,7 +62,9 @@ int askpst=0;
 int great_than_three_bid = 0;
 int great_than_three_ask = 0;
 int bi=30;
-
+extern int realLongPstLimit;
+extern int realShortPstLimit;
+extern int pstalarm;
 double settlementPrice = 10;
 string sep = ";";
 //保存交易数据
@@ -75,12 +78,12 @@ void logEngine(){
     cout<<boosttoolsnamespace::CBoostTools::gbktoutf8("启动进程")<<endl;
 	ofstream in;
 	in.open(filepath,ios::app); //ios::trunc表示在打开文件前将文件清空,由于是写入,文件不存在则创建
-    LogMsg *pData;
+
     while(1)
     {
-
+        LogMsg *pData;
         if(logqueue.empty()){
-            sleep(1);
+            sleep(100);
         }else if( logqueue.pop( pData ) ){
             //cout<<pData->getMsg()<<" "<<logqueue.empty()<<endl;
             string info;
@@ -104,7 +107,7 @@ void marketdataEngine(){
     while(1){
         LogMsg *pData;
         if(mkdataqueue.empty()){
-            sleep(1);
+            sleep(100);
         }else if(mkdataqueue.pop(pData)){
             c++;
             string info;
@@ -355,7 +358,9 @@ void OnRtnSHFEMarketData(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
     mkdataqueue.push(logmsg);
 
 
-
+    if((realLongPstLimit + realShortPstLimit) >= pstalarm){
+        cout<<"pstatalam "<<endl;
+    }
     if(previous_price == 0){
         previous_price = lastPrice;
         return;
@@ -393,14 +398,15 @@ void OnRtnSHFEMarketData(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
     sprintf(c_last_gap,"%f",last_gap);
     char tmp_msg[256];
     sprintf(tmp_msg,"currPrice=%s,prePrice=%s,currGap=%s,lastGap=%s",c_lastp,c_pre_p,c_cur_gap,c_last_gap);
-    cout<<tmp_msg<<endl;
+    //cout<<tmp_msg<<endl;
+    LOG(INFO)<<string(tmp_msg);
     previous_price = lastPrice;
     if(last_gap == -1){
         last_gap = gap;
-        cout<<"init gap"<<endl;
+        //cout<<"init gap"<<endl;
         return;
     }else if(last_gap == gap){
-        cout<<"last_gap==gap"<<endl;
+        //cout<<"last_gap==gap"<<endl;
         return;
     }else if(last_gap < gap){
         down_culculate = 0;
@@ -427,16 +433,24 @@ void OnRtnSHFEMarketData(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
             orderoffset = getCloseMethod();
         }
         strcpy(char_orderoffset,orderoffset.c_str());
-        cout<<"sell"<<endl;
+        //cout<<"sell"<<endl;
+
+        if(isTest == 1){
+            sprintf(c_price,"%f",bidPrice);
+            pUserSpi->md_orderinsert(bidPrice,char_orderdir,char_orderoffset,instrumentID,default_volume);
+        }else if(isTest == 2){
+            sprintf(c_price,"%f",max_price);
+            pUserSpi->md_orderinsert(max_price,char_orderdir,char_orderoffset,instrumentID,default_volume);
+        }
         char c_msg[300];
         sprintf(c_upcul,"%d",up_culculate);
         sprintf(c_downcul,"%d",down_culculate);
-        sprintf(c_price,"%f",max_price);
         sprintf(c_msg,"order: instrumentid=%s,direction=%s,offsetflag=%s,price=%s,up_culculate=%s,down_culculate=%s",
                 singleInstrument,char_orderdir,char_orderoffset,c_price,c_upcul,c_downcul);
         LOG(INFO)<<string(c_msg);
-        //pUserSpi->md_orderinsert(askPrice,char_orderdir,char_orderoffset,instrumentID,default_volume);
-        pUserSpi->md_orderinsert(max_price,char_orderdir,char_orderoffset,instrumentID,default_volume);
+        LogMsg *tradeMsg = new LogMsg();
+        tradeMsg->setMsg(string(c_msg));
+        logqueue.push(tradeMsg);
     }else if(down_culculate >= cul_times){
         //买
         char char_orderdir[] = "0";
@@ -447,16 +461,25 @@ void OnRtnSHFEMarketData(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
             orderoffset = getCloseMethod();
         }
         strcpy(char_orderoffset,orderoffset.c_str());
-        cout<<"buy"<<endl;
+        //cout<<"buy"<<endl;
+
+        if(isTest == 1){
+            sprintf(c_price,"%f",askPrice);
+            pUserSpi->md_orderinsert(askPrice,char_orderdir,char_orderoffset,instrumentID,default_volume);
+        }else if(isTest == 2){
+            sprintf(c_price,"%f",min_price);
+            pUserSpi->md_orderinsert(min_price,char_orderdir,char_orderoffset,instrumentID,default_volume);
+        }
         char c_msg[300];
         sprintf(c_upcul,"%d",up_culculate);
         sprintf(c_downcul,"%d",down_culculate);
-        sprintf(c_price,"%f",max_price);
+
         sprintf(c_msg,"order: instrumentid=%s,direction=%s,offsetflag=%s,price=%s,up_culculate=%s,down_culculate=%s",
                 singleInstrument,char_orderdir,char_orderoffset,c_price,c_upcul,c_downcul);
         LOG(INFO)<<string(c_msg);
-       // pUserSpi->md_orderinsert(bidPrice,char_orderdir,char_orderoffset,instrumentID,default_volume);
-        pUserSpi->md_orderinsert(min_price,char_orderdir,char_orderoffset,instrumentID,default_volume);
+        LogMsg *tradeMsg = new LogMsg();
+        tradeMsg->setMsg(string(c_msg));
+        logqueue.push(tradeMsg);
     }
 
     //处理行情
