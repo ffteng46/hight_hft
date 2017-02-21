@@ -27,7 +27,8 @@ extern int iRequestID;
 extern int g_nOrdLocalID;
 extern double tick;
 extern int isclose;
-extern int offset_flag;
+extern int long_offset_flag;
+extern int short_offset_flag;
 extern int limit_volume;
 extern bool isrtntradeprocess;
 //跌停价格
@@ -83,10 +84,10 @@ int CTraderSpi::md_orderinsert(double price,char *dir,char *offset,char * ins,in
     //开仓手数
     int Volume = ordervolume;
     //报单引用编号
-    sprintf(UserOrderLocalID,"%d",++g_nOrdLocalID);
+    //sprintf(UserOrderLocalID,"%d",++g_nOrdLocalID);
     //cout<<"------->"<<ORDER_REF<<endl;
     //cout<<"2"<<endl;
-    //g_nOrdLocalID++;
+    //++g_nOrdLocalID;
     //报单结构体
     CUstpFtdcInputOrderField req;
     ///经纪公司代码
@@ -98,7 +99,8 @@ int CTraderSpi::md_orderinsert(double price,char *dir,char *offset,char * ins,in
     strcpy(req.InstrumentID, ins);
     //cout<<"instrumentid="<<string(req.InstrumentID)<<endl;
     ///报单引用
-    strcpy(req.UserOrderLocalID, UserOrderLocalID);
+    sprintf(req.UserOrderLocalID,"%012d",++g_nOrdLocalID);
+    //strcpy(req.UserOrderLocalID, UserOrderLocalID);
    // cout<<"3"<<endl;
     ///用户代码
     //	TUstpFtdcUserIDType	UserID;
@@ -244,7 +246,7 @@ void CTraderSpi:: OnFrontDisconnected(int nReason)
     /*d.setMsg(msg2);
 //    logqueue.push( &d */
     LOG(INFO)<<msg2;
-    sleep(200);
+    sleep(10);
 }
 void CTraderSpi::OnRspUserLogin(CUstpFtdcRspUserLoginField *pRspUserLogin, CUstpFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast)
 {
@@ -253,7 +255,7 @@ void CTraderSpi::OnRspUserLogin(CUstpFtdcRspUserLoginField *pRspUserLogin, CUstp
     if (bIsLast && !IsErrorRspInfo(pRspInfo))
     //if (pRspInfo!=NULL&&pRspInfo->ErrorID!=0)
 	{
-        g_nOrdLocalID=atoi(pRspUserLogin->MaxOrderLocalID)+1;
+        g_nOrdLocalID=atoi(pRspUserLogin->MaxOrderLocalID)+10000;
         printf("-----------------------------\n");
         printf("登录成功，最大本地报单号:%d\n",g_nOrdLocalID);
         printf("-----------------------------\n");
@@ -297,6 +299,9 @@ void CTraderSpi::ReqInvestorAccount(){
 void CTraderSpi::ReqQryInvestorPosition()
 {
     querySleep();
+    for(unordered_map<string,unordered_map<string,int>>::iterator tmpit = positionmap.begin();tmpit != positionmap.end();tmpit ++){
+        positionmap.erase(tmpit);
+    }
     CUstpFtdcQryInvestorPositionField req;
     memset(&req, 0, sizeof(req));
     strcpy(req.BrokerID, BROKER_ID);
@@ -322,7 +327,6 @@ void CTraderSpi::OnRspQryInvestorPosition(CUstpFtdcRspInvestorPositionField *pRs
     }
     if (bIsLast && !IsErrorRspInfo(pRspInfo))
     {
-
         int isbeginmk = 0;
         unordered_map<string,unordered_map<string,int>>::iterator tmpit = positionmap.begin();
         if(tmpit == positionmap.end()){
@@ -331,13 +335,34 @@ void CTraderSpi::OnRspQryInvestorPosition(CUstpFtdcRspInvestorPositionField *pRs
             for(;tmpit != positionmap.end();tmpit ++){
                 string str_instrument = tmpit->first;
                 unordered_map<string,int> tmppst = tmpit->second;
-                int longpst = tmppst["longTotalPosition"];
-                int shortpst = tmppst["shortTotalPosition"];
-                char char_longpst[12] = {'\0'};
-                char char_shortpst[12] = {'\0'};
-                sprintf(char_longpst,"%d",longpst);
-                sprintf(char_shortpst,"%d",shortpst);
-                string pst_msg = "持仓结构:"+str_instrument + ",多头持仓量=" + string(char_longpst) + ",空头持仓量=" + string(char_shortpst) ;
+                char char_tmp_pst[10] = {'\0'};
+                char char_longyd_pst[10] = {'\0'};
+                char char_longtd_pst[10] = {'\0'};
+                sprintf(char_tmp_pst,"%d",tmppst["longTotalPosition"]);
+                sprintf(char_longyd_pst,"%d",tmppst["longYdPosition"]);
+                sprintf(char_longtd_pst,"%d",tmppst["longTdPosition"]);
+                char char_tmp_pst2[10] = {'\0'};
+                char char_shortyd_pst[10] = {'\0'};
+                char char_shorttd_pst[10] = {'\0'};
+                sprintf(char_tmp_pst2,"%d",tmppst["shortTotalPosition"]);
+                sprintf(char_shortyd_pst,"%d",tmppst["shortYdPosition"]);
+                sprintf(char_shorttd_pst,"%d",tmppst["shortTdPosition"]);
+                if(tmppst["longYdPosition"] > 0){
+                    shortPstIsClose = 2;
+                    short_offset_flag = 4;
+                }
+                if(tmppst["shortYdPosition"] > 0){
+                    longPstIsClose = 2;
+                    long_offset_flag = 4;
+                }
+//                int longpst = tmppst["longTotalPosition"];
+//                int shortpst = tmppst["shortTotalPosition"];
+//                char char_longpst[12] = {'\0'};
+//                char char_shortpst[12] = {'\0'};
+//                sprintf(char_longpst,"%d",longpst);
+//                sprintf(char_shortpst,"%d",shortpst);
+                string pst_msg = "持仓结构:"+str_instrument + ",多头持仓量=" + string(char_tmp_pst) + ",今仓数量=" + string(char_longtd_pst) + ",昨仓数量=" + string(char_longyd_pst) +
+                        ";空头持仓量=" + string(char_tmp_pst2) + ",今仓数量=" + string(char_shorttd_pst) + ",昨仓数量=" + string(char_shortyd_pst) ;
                 cout<<pst_msg<<endl;
                 LOG(INFO)<<pst_msg;
             }
@@ -490,7 +515,7 @@ void CTraderSpi::ReqQryInstrument(char *instrumentid)
 //    memset(&QryInstrument,0,sizeof(CUstpFtdcQryInstrumentField));
 //    //strcpy(QryInstrument.ExchangeID,"CFFEX");
 //    //strcpy(QryInstrument.InstrumentID,"IF1206");
-//    pUserApi->ReqQryInstrument(&QryInstrument,g_nOrdLocalID++);
+//    pUserApi->ReqQryInstrument(&QryInstrument,++g_nOrdLocalID);
     cerr << "--->>> " << "ReqQryInstrument,ins="<<instrumentid << endl;
     CUstpFtdcQryInstrumentField req;
     memset(&req, 0, sizeof(req));
@@ -1032,7 +1057,7 @@ string getInvestorOrderInsertInfo(CUstpFtdcInputOrderField *order)
     ///合约代码
     char	*InstrumentID = order->InstrumentID;
     ///报单引用
-    char	*g_nOrdLocalID = order->UserOrderLocalID;
+    char	*nOrdLocalID = order->UserOrderLocalID;
     ///用户代码
     char	*UserID = order->UserID;
     ///报单价格条件
@@ -1080,7 +1105,7 @@ string getInvestorOrderInsertInfo(CUstpFtdcInputOrderField *order)
     ordreInfo.append("BrokerID=").append(BrokerID);ordreInfo.append("\t");
     ordreInfo.append("InvestorID=").append(InvestorID);ordreInfo.append("\t");
     ordreInfo.append("InstrumentID=").append(InstrumentID);ordreInfo.append("\t");
-    ordreInfo.append("g_nOrdLocalID=").append(g_nOrdLocalID);ordreInfo.append("\t");
+    ordreInfo.append("g_nOrdLocalID=").append(nOrdLocalID);ordreInfo.append("\t");
     ordreInfo.append("UserID=").append(UserID);ordreInfo.append("\t");
     ordreInfo.append("Direction").append(Direction);ordreInfo.append("\t");
     ordreInfo.append("CombOffsetFlag").append(CombOffsetFlag);ordreInfo.append("\t");
@@ -1102,7 +1127,7 @@ bool CTraderSpi::IsErrorRspInfo(CUstpFtdcRspInfoField *pRspInfo)
     if (bResult){
         string errmsg =pRspInfo->ErrorMsg;
         if(pRspInfo->ErrorID == 12){//重复的ref
-            g_nOrdLocalID += 1000;
+            g_nOrdLocalID += 10000;
             cerr << "--->>> ErrorID=" << pRspInfo->ErrorID << ", ErrorMsg=" << errmsg <<",g_nOrdLocalID增加="<<g_nOrdLocalID<<endl;
             sprintf(char_msg, "--->>> ErrorID=%d,ErrorMsg=%s,g_nOrdLocalID增加=%d",pRspInfo->ErrorID,  boosttoolsnamespace::CBoostTools::gbktoutf8(pRspInfo->ErrorMsg),g_nOrdLocalID);
 
@@ -1291,6 +1316,10 @@ int CTraderSpi::processtrade(CUstpFtdcTradeField *pTrade)
                 map_iterator->second["shortTdPosition"] = tmp_tdpst;
                 map_iterator->second["shortYdPosition"] = tmp_ydpst;
                 map_iterator->second["shortTotalPosition"] = realShortPstLimit;
+                if(tmp_ydpst == 0){//buy open
+                    longPstIsClose = 1;
+                    long_offset_flag = 1;
+                }
             }else if(str_offset == "3"){//平今
                 int tmp_tdpst = map_iterator->second["shortTdPosition"];
                 int tmp_ydpst = map_iterator->second["shortYdPosition"];
@@ -1305,6 +1334,10 @@ int CTraderSpi::processtrade(CUstpFtdcTradeField *pTrade)
                 realShortPstLimit = tmp_ydpst + tmp_tdpst;
                 map_iterator->second["shortYdPosition"] = tmp_ydpst;
                 map_iterator->second["shortTotalPosition"] = realShortPstLimit;
+                if(tmp_ydpst == 0){
+                    longPstIsClose = 1;
+                    long_offset_flag = 1;
+                }
             }
         }else if(str_dir == "1"){//卖
             if(str_offset == "0"){//卖开仓,空头增加
@@ -1333,6 +1366,10 @@ int CTraderSpi::processtrade(CUstpFtdcTradeField *pTrade)
                 map_iterator->second["longTdPosition"] = tmp_tdpst;
                 map_iterator->second["longYdPosition"] = tmp_ydpst;
                 map_iterator->second["longTotalPosition"] = realLongPstLimit;
+                if(tmp_ydpst == 0){//sell open
+                    shortPstIsClose = 1;
+                    short_offset_flag = 1;
+                }
             }else if(str_offset == "3"){//平今
                 int tmp_tdpst = map_iterator->second["longTdPosition"];
                 int tmp_ydpst = map_iterator->second["longYdPosition"];
@@ -1347,6 +1384,10 @@ int CTraderSpi::processtrade(CUstpFtdcTradeField *pTrade)
                 realLongPstLimit = tmp_ydpst + tmp_tdpst;
                 map_iterator->second["longYdPosition"] = tmp_ydpst;
                 map_iterator->second["longTotalPosition"] = realLongPstLimit;
+                if(tmp_ydpst == 0){//sell open
+                    shortPstIsClose = 1;
+                    short_offset_flag = 1;
+                }
             }
         }
         if(realLongPstLimit > longpstlimit){ //多头超过持仓限额，且必须空头有持仓才能多头平仓
@@ -1383,14 +1424,31 @@ int CTraderSpi::processtrade(CUstpFtdcTradeField *pTrade)
     for(unordered_map<string,unordered_map<string,int>>::iterator it=positionmap.begin();it != positionmap.end();it ++){
         tmpmsg.append(it->first).append("持仓情况:");
         char char_tmp_pst[10] = {'\0'};
+        char char_longyd_pst[10] = {'\0'};
+        char char_longtd_pst[10] = {'\0'};
         sprintf(char_tmp_pst,"%d",it->second["longTotalPosition"]);
+        sprintf(char_longyd_pst,"%d",it->second["longYdPosition"]);
+        sprintf(char_longtd_pst,"%d",it->second["longTdPosition"]);
         tmpmsg.append("多头数量=");
         tmpmsg.append(char_tmp_pst);
+        tmpmsg.append(";今仓数量=");
+        tmpmsg.append(char_longtd_pst);
+        tmpmsg.append(";昨仓数量=");
+        tmpmsg.append(char_longyd_pst);
         char char_tmp_pst2[10] = {'\0'};
+        char char_shortyd_pst[10] = {'\0'};
+        char char_shorttd_pst[10] = {'\0'};
         sprintf(char_tmp_pst2,"%d",it->second["shortTotalPosition"]);
+        sprintf(char_shortyd_pst,"%d",it->second["shortYdPosition"]);
+        sprintf(char_shorttd_pst,"%d",it->second["shortTdPosition"]);
         tmpmsg.append("空头数量=");
         tmpmsg.append(char_tmp_pst2);
+        tmpmsg.append(";今仓数量=");
+        tmpmsg.append(char_shorttd_pst);
+        tmpmsg.append(";昨仓数量=");
+        tmpmsg.append(char_shortyd_pst);
     }
+    cout<<tmpmsg<<endl;
     LOG(INFO)<<tmpmsg;
     return 0;
 }

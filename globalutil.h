@@ -44,7 +44,7 @@ private:
 };
 void recordRunningMsg(string msg);
 void OnRtnSHFEMarketData(CXeleShfeHighLevelOneMarketData *pDepthMarketData);
-string getCloseMethod();
+string getCloseMethod(string type);
 void initPriceGap();
 //query frequence
 void querySleep();

@@ -20,7 +20,8 @@ list<string> mkdata;
 extern boost::lockfree::queue<LogMsg*> mkdataqueue;
 ///日志消息队列
 extern boost::lockfree::queue<LogMsg*> logqueue;
-extern int offset_flag;
+extern int long_offset_flag;
+extern int short_offset_flag;
 //买平标志,1开仓；2平仓
 extern int longPstIsClose;
 extern int shortPstIsClose;
@@ -201,16 +202,28 @@ void test(){
     }
 
 }
-string getCloseMethod(){
+string getCloseMethod(string type){
     //平仓  开仓 '0';平仓 '1';平今 '3';平昨 '4';强平 '2'
     string orderoffset = "1";
-    if(offset_flag == 1){
-        orderoffset = "1";
-    }else if(offset_flag == 3){
-        orderoffset = "3";
-    }else if(offset_flag == 4){
-        orderoffset = "4";
+    if("sell" == type){
+        if(short_offset_flag == 1){
+            orderoffset = "1";
+        }else if(short_offset_flag == 3){
+            orderoffset = "3";
+        }else if(short_offset_flag == 4){
+            orderoffset = "4";
+        }
     }
+    if("buy" == type){
+        if(long_offset_flag == 1){
+            orderoffset = "1";
+        }else if(long_offset_flag == 3){
+            orderoffset = "3";
+        }else if(long_offset_flag == 4){
+            orderoffset = "4";
+        }
+    }
+
     return orderoffset;
 }
 void initPriceGap(){
@@ -430,14 +443,14 @@ void OnRtnSHFEMarketData(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
         if(shortPstIsClose == 1){//开仓
             orderoffset = "0";
         }else if(shortPstIsClose == 2){//平仓  开仓 '0';平仓 '1';平今 '3';平昨 '4';强平 '2'
-            orderoffset = getCloseMethod();
+            orderoffset = getCloseMethod("sell");
         }
         strcpy(char_orderoffset,orderoffset.c_str());
         //cout<<"sell"<<endl;
 
         if(isTest == 1){
-            sprintf(c_price,"%f",bidPrice);
-            pUserSpi->md_orderinsert(bidPrice,char_orderdir,char_orderoffset,instrumentID,default_volume);
+            sprintf(c_price,"%f",askPrice);
+            pUserSpi->md_orderinsert(askPrice,char_orderdir,char_orderoffset,instrumentID,default_volume);
         }else if(isTest == 2){
             sprintf(c_price,"%f",max_price);
             pUserSpi->md_orderinsert(max_price,char_orderdir,char_orderoffset,instrumentID,default_volume);
@@ -458,14 +471,14 @@ void OnRtnSHFEMarketData(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
         if(longPstIsClose == 1){//开仓
             orderoffset = "0";
         }else if(longPstIsClose == 2){//平仓  开仓 '0';平仓 '1';平今 '3';平昨 '4';强平 '2'
-            orderoffset = getCloseMethod();
+            orderoffset = getCloseMethod("buy");
         }
         strcpy(char_orderoffset,orderoffset.c_str());
         //cout<<"buy"<<endl;
 
         if(isTest == 1){
-            sprintf(c_price,"%f",askPrice);
-            pUserSpi->md_orderinsert(askPrice,char_orderdir,char_orderoffset,instrumentID,default_volume);
+            sprintf(c_price,"%f",bidPrice);
+            pUserSpi->md_orderinsert(bidPrice,char_orderdir,char_orderoffset,instrumentID,default_volume);
         }else if(isTest == 2){
             sprintf(c_price,"%f",min_price);
             pUserSpi->md_orderinsert(min_price,char_orderdir,char_orderoffset,instrumentID,default_volume);

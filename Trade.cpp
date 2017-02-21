@@ -73,7 +73,8 @@ boost::lockfree::queue<LogMsg*> logqueue(1000);
 //存放行情消息队列
 boost::lockfree::queue<LogMsg*> mkdataqueue(1000);
 ////组合开平标志: 开仓 '0';平仓 '1';平今 '3';平昨 '4';强平 '2'
-int offset_flag = 1;
+int long_offset_flag = 1;
+int short_offset_flag = 1;
 //前置id
 char char_front_id[12] = {'\0'};
 char char_session_id[20] = {'\0'};
