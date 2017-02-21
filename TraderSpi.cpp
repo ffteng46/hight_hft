@@ -29,6 +29,12 @@ extern double tick;
 extern int isclose;
 extern int long_offset_flag;
 extern int short_offset_flag;
+//卖出报单触发信号
+extern int askCulTimes;
+//买入报单触发信号
+extern int bidCulTimes;
+//报单触发信号
+extern int cul_times;
 extern int limit_volume;
 extern bool isrtntradeprocess;
 //跌停价格
@@ -56,6 +62,7 @@ int ret = 0;
 int start_process = 0;
 int realLongPstLimit = 0;
 int realShortPstLimit = 0;
+int lastABSSpread = 0;
 CTraderSpi::CTraderSpi(CUstpFtdcTraderApi *pTrader):m_pUserApi(pTrader)
 {
 
@@ -1390,35 +1397,35 @@ int CTraderSpi::processtrade(CUstpFtdcTradeField *pTrade)
                 }
             }
         }
-        if(realLongPstLimit > longpstlimit){ //多头超过持仓限额，且必须空头有持仓才能多头平仓
-            char char_limit[10] = {'\0'};
-            sprintf(char_limit,"%d",realLongPstLimit);
-            if(realShortPstLimit == 0){
-                longPstIsClose = 1;
-                string tmpmsg= "多头持仓量=";
-                tmpmsg.append(char_limit).append("大于longpstlimit,but realShortPstLimit is zero,仍然为多头开仓");
-                LOG(INFO)<<tmpmsg;
-            }else{
-                longPstIsClose = 2;
-                string tmpmsg= "多头持仓量=";
-                tmpmsg.append(char_limit).append("大于longpstlimit,and realShortPstLimit is not zero,修改为多头平仓");
-                LOG(INFO)<<tmpmsg;
-            }
-        }else if(realShortPstLimit > shortpstlimit){//空头开平仓判断
-            char char_limit[10] = {'\0'};
-            sprintf(char_limit,"%d",realShortPstLimit);
-            if(realLongPstLimit == 0){
-                shortPstIsClose = 1;
-                string tmpmsg= "空头持仓量=";
-                tmpmsg.append(char_limit).append("大于shortpstlimit,but realLongPstLimit is zero,仍然为空头开仓");
-                LOG(INFO)<<tmpmsg;
-            }else{
-                shortPstIsClose = 2;
-                string tmpmsg= "空头持仓量=";
-                tmpmsg.append(char_limit).append("大于shortpstlimit,and realLongPstLimit is not zero,修改为空头平仓");
-                LOG(INFO)<<tmpmsg;
-            }
-        }
+//        if(realLongPstLimit > longpstlimit){ //多头超过持仓限额，且必须空头有持仓才能多头平仓
+//            char char_limit[10] = {'\0'};
+//            sprintf(char_limit,"%d",realLongPstLimit);
+//            if(realShortPstLimit == 0){
+//                longPstIsClose = 1;
+//                string tmpmsg= "多头持仓量=";
+//                tmpmsg.append(char_limit).append("大于longpstlimit,but realShortPstLimit is zero,仍然为多头开仓");
+//                LOG(INFO)<<tmpmsg;
+//            }else{
+//                longPstIsClose = 2;
+//                string tmpmsg= "多头持仓量=";
+//                tmpmsg.append(char_limit).append("大于longpstlimit,and realShortPstLimit is not zero,修改为多头平仓");
+//                LOG(INFO)<<tmpmsg;
+//            }
+//        }else if(realShortPstLimit > shortpstlimit){//空头开平仓判断
+//            char char_limit[10] = {'\0'};
+//            sprintf(char_limit,"%d",realShortPstLimit);
+//            if(realLongPstLimit == 0){
+//                shortPstIsClose = 1;
+//                string tmpmsg= "空头持仓量=";
+//                tmpmsg.append(char_limit).append("大于shortpstlimit,but realLongPstLimit is zero,仍然为空头开仓");
+//                LOG(INFO)<<tmpmsg;
+//            }else{
+//                shortPstIsClose = 2;
+//                string tmpmsg= "空头持仓量=";
+//                tmpmsg.append(char_limit).append("大于shortpstlimit,and realLongPstLimit is not zero,修改为空头平仓");
+//                LOG(INFO)<<tmpmsg;
+//            }
+//        }
     }
     string tmpmsg;
     for(unordered_map<string,unordered_map<string,int>>::iterator it=positionmap.begin();it != positionmap.end();it ++){
@@ -1452,6 +1459,111 @@ int CTraderSpi::processtrade(CUstpFtdcTradeField *pTrade)
     LOG(INFO)<<tmpmsg;
     return 0;
 }
+void CTraderSpi::tradeParaProcess(){
+    for(unordered_map<string,unordered_map<string,int>>::iterator map_iterator=positionmap.begin();map_iterator != positionmap.end();map_iterator ++){
+        string tmpmsg;
+        realShortPstLimit = map_iterator->second["shortTotalPosition"];
+        realLongPstLimit = map_iterator->second["longTotalPosition"];
+        // buy or open judge
+        if(realLongPstLimit > longpstlimit){ //多头超过持仓限额，且必须空头有持仓才能多头平仓
+            char char_limit[10] = {'\0'};
+            sprintf(char_limit,"%d",realLongPstLimit);
+            if(realShortPstLimit == 0){
+                longPstIsClose = 1;
+                string tmpmsg= "多头持仓量=";
+                tmpmsg.append(char_limit).append("大于longpstlimit,but realShortPstLimit is zero,仍然为多头开仓");
+                LOG(INFO)<<tmpmsg;
+            }else{
+                longPstIsClose = 2;
+                string tmpmsg= "多头持仓量=";
+                tmpmsg.append(char_limit).append("大于longpstlimit,and realShortPstLimit is not zero,修改为多头平仓");
+                LOG(INFO)<<tmpmsg;
+            }
+        }else if(realShortPstLimit > shortpstlimit){//空头开平仓判断
+            char char_limit[10] = {'\0'};
+            sprintf(char_limit,"%d",realShortPstLimit);
+            if(realLongPstLimit == 0){
+                shortPstIsClose = 1;
+                string tmpmsg= "空头持仓量=";
+                tmpmsg.append(char_limit).append("大于shortpstlimit,but realLongPstLimit is zero,仍然为空头开仓");
+                LOG(INFO)<<tmpmsg;
+            }else{
+                shortPstIsClose = 2;
+                string tmpmsg= "空头持仓量=";
+                tmpmsg.append(char_limit).append("大于shortpstlimit,and realLongPstLimit is not zero,修改为空头平仓");
+                LOG(INFO)<<tmpmsg;
+            }
+        }
+        cout<<tmpmsg<<endl;
+        LOG(INFO)<<tmpmsg;
+
+        //spread set
+        int bidAkdSpread = abs(realShortPstLimit - realLongPstLimit);
+        if(bidAkdSpread < lastABSSpread){
+            return;//avaialable
+        }
+        string s_msg;
+        char c_bss[10];
+        char c_realShortPstLimit[10];
+        char c_realLongPstLimit[10];
+        sprintf(c_bss,"%d",bidAkdSpread);
+        sprintf(c_realShortPstLimit,"%d",realShortPstLimit);
+        sprintf(c_realLongPstLimit,"%d",realLongPstLimit);
+        if(bidAkdSpread >= 5 && bidAkdSpread <10){
+            lastABSSpread = bidAkdSpread;
+            if(realShortPstLimit > realLongPstLimit){//increase ask(sell) spread
+                char c_pre_askCulTimes[10];
+                sprintf(c_pre_askCulTimes,"%d",askCulTimes);
+                askCulTimes += 1;
+                char c_after_askCulTimes[10];
+                sprintf(c_after_askCulTimes,"%d",askCulTimes);
+                s_msg = "bidpst=" + string(c_realLongPstLimit) + ",askpst=" + string(c_realShortPstLimit) + ",spread=" + string(c_bss) +",>=5 and <10,askCulTimes is set from " +
+                        string(c_pre_askCulTimes) + "to " + string(c_after_askCulTimes);
+            }else{
+                char c_pre_bidCulTimes[10];
+                sprintf(c_pre_bidCulTimes,"%d",bidCulTimes);
+                bidCulTimes += 1;
+                char c_after_bidCulTimes[10];
+                sprintf(c_after_bidCulTimes,"%d",bidCulTimes);
+                s_msg = "bidpst=" + string(c_realLongPstLimit) + ",askpst=" + string(c_realShortPstLimit) + ",spread=" + string(c_bss) +",>=5 and <10,bidCulTimes is set from " +
+                        string(c_pre_bidCulTimes) + "to " + string(c_after_bidCulTimes);
+
+            }
+        }else if(bidAkdSpread >= 10){
+            lastABSSpread = bidAkdSpread;
+            if(realShortPstLimit > realLongPstLimit){//increase ask(sell) spread
+                char c_pre_askCulTimes[10];
+                sprintf(c_pre_askCulTimes,"%d",askCulTimes);
+                askCulTimes += 2;
+                char c_after_askCulTimes[10];
+                sprintf(c_after_askCulTimes,"%d",askCulTimes);
+                s_msg = "bidpst=" + string(c_realLongPstLimit) + ",askpst=" + string(c_realShortPstLimit) + ",spread=" + string(c_bss) +",>=10,askCulTimes is set from " +
+                        string(c_pre_askCulTimes) + "to " + string(c_after_askCulTimes);
+            }else{
+                char c_pre_bidCulTimes[10];
+                sprintf(c_pre_bidCulTimes,"%d",bidCulTimes);
+                bidCulTimes += 2;
+                char c_after_bidCulTimes[10];
+                sprintf(c_after_bidCulTimes,"%d",bidCulTimes);
+                s_msg = "bidpst=" + string(c_realLongPstLimit) + ",askpst=" + string(c_realShortPstLimit) + ",spread=" + string(c_bss) +",>=10,bidCulTimes is set from " +
+                        string(c_pre_bidCulTimes) + "to " + string(c_after_bidCulTimes);
+            }
+        }else{
+            char c_askCulTimes[10];
+            sprintf(c_askCulTimes,"%d",askCulTimes);
+            char c_bidCulTimes[10];
+            sprintf(c_bidCulTimes,"%d",bidCulTimes);
+            askCulTimes = cul_times;
+            bidCulTimes = cul_times;
+            char c_culTime[10];
+            sprintf(c_culTime,"%d",cul_times);
+            s_msg = "bidpst=" + string(c_realLongPstLimit) + ",askpst=" + string(c_realShortPstLimit) + ",spread=" + string(c_bss) +",<5,bidCulTimes is set from " +
+                    string(c_bidCulTimes) + "to " + string(c_culTime) + ";askCulTimes is set from " + string(c_askCulTimes) + "to " + string(c_culTime);
+        }
+    }
+
+}
+
 //将投资者持仓信息写入文件保存
 int CTraderSpi::storeInvestorPosition(CUstpFtdcRspInvestorPositionField *pInvestorPosition)
 {
