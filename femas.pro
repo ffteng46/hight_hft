@@ -5,7 +5,6 @@ CONFIG -= qt
 
 SOURCES += \
     TraderSpi.cpp \
-    PublicFuncs.cpp \
     globalutil.cpp \
     boost_tools.cpp \
     Trade.cpp \
@@ -19,7 +18,6 @@ LIBS += -Lconfig -lUSTPtraderapi -lXeleMdAPI64
 LIBS +=  -lpthread -lrt
 HEADERS += \
     TraderSpi.h \
-    PublicFuncs.h \
     globalutil.h \
     boost_tools.h \
     Trade.h \

@@ -47,10 +47,10 @@ double min_price = 0;
 double max_price = 0;
 //价格变动单位
 double tick = 0;
-//卖出价格振幅
-int tickSpreadSell = 3;
-//买入价格振幅
-int tickSpreadBuy = 3;
+//卖出报单触发信号
+int askCulTimes = 3;
+//买入报单触发信号
+int bidCulTimes = 3;
 //买平标志,1开仓；2平仓
 int longPstIsClose = 1;
 int shortPstIsClose = 1;
@@ -170,6 +170,8 @@ void TradeProcess::datainit(){
                     strcpy(MD_FRONT_ADDR,vec[1].c_str());
                 }else if("cul_times"==vec[0]){
                     cul_times = boost::lexical_cast<int>(vec[1]);
+                    askCulTimes = cul_times;
+                    bidCulTimes = cul_times;
                 }else if("isTest"==vec[0]){
                     isTest = boost::lexical_cast<int>(vec[1]);
                 }else if("min_price"==vec[0]){
@@ -223,7 +225,6 @@ void TradeProcess::datainit(){
 void TradeProcess::tradeinit(){
     cout<<"start to init tradeapi"<<endl;
     CUstpFtdcTraderApi *pTrader = CUstpFtdcTraderApi::CreateFtdcTraderApi("");
-    g_puserapi=pTrader;
     pUserApi = pTrader;
     CTraderSpi spi(pTrader);
     pTrader->RegisterFront(FRONT_ADDR);
