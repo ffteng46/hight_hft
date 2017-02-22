@@ -1,4 +1,4 @@
-// TraderSpi.cpp: implementation of the CTraderSpi class.
+﻿// TraderSpi.cpp: implementation of the CTraderSpi class.
 //
 //////////////////////////////////////////////////////////////////////
 
@@ -1461,6 +1461,9 @@ int CTraderSpi::processtrade(CUstpFtdcTradeField *pTrade)
     }
     cout<<tmpmsg<<endl;
     LOG(INFO)<<tmpmsg;
+    LogMsg *logmsg = new LogMsg();
+    logmsg->setMsg(tmpmsg);
+    logqueue.push(logmsg);
     return 0;
 }
 void CTraderSpi::tradeParaProcess(){
@@ -1474,36 +1477,52 @@ void CTraderSpi::tradeParaProcess(){
             sprintf(char_limit,"%d",realLongPstLimit);
             if(realShortPstLimit == 0){
                 longPstIsClose = 1;
-                string tmpmsg= "多头持仓量=";
+                tmpmsg.append("多头持仓量=");
                 tmpmsg.append(char_limit).append("大于longpstlimit,but realShortPstLimit is zero,仍然为多头开仓");
-                LOG(INFO)<<tmpmsg;
+                //LOG(INFO)<<tmpmsg;
             }else{
                 longPstIsClose = 2;
-                string tmpmsg= "多头持仓量=";
+                tmpmsg.append("多头持仓量=");
                 tmpmsg.append(char_limit).append("大于longpstlimit,and realShortPstLimit is not zero,修改为多头平仓");
-                LOG(INFO)<<tmpmsg;
+                //LOG(INFO)<<tmpmsg;
             }
         }else if(realShortPstLimit > shortpstlimit){//空头开平仓判断
             char char_limit[10] = {'\0'};
             sprintf(char_limit,"%d",realShortPstLimit);
             if(realLongPstLimit == 0){
                 shortPstIsClose = 1;
-                string tmpmsg= "空头持仓量=";
+                tmpmsg.append("空头持仓量=");
                 tmpmsg.append(char_limit).append("大于shortpstlimit,but realLongPstLimit is zero,仍然为空头开仓");
-                LOG(INFO)<<tmpmsg;
+                //LOG(INFO)<<tmpmsg;
             }else{
                 shortPstIsClose = 2;
-                string tmpmsg= "空头持仓量=";
+                tmpmsg.append("空头持仓量=");
                 tmpmsg.append(char_limit).append("大于shortpstlimit,and realLongPstLimit is not zero,修改为空头平仓");
-                LOG(INFO)<<tmpmsg;
+                //LOG(INFO)<<tmpmsg;
             }
         }
+        LogMsg *logmsg = new LogMsg();
+        logmsg->setMsg(tmpmsg);
+        logqueue.push(logmsg);
         cout<<tmpmsg<<endl;
         LOG(INFO)<<tmpmsg;
 
         //spread set
         int bidAkdSpread = abs(realShortPstLimit - realLongPstLimit);
-        if(bidAkdSpread < lastABSSpread){
+        if(bidAkdSpread < lastABSSpread && bidAkdSpread >= 5){
+
+            char c_bas[10];
+            sprintf(c_bas,"%d",bidAkdSpread);
+            char c_lasts[10];
+            sprintf(c_lasts,"%d",lastABSSpread);
+            lastABSSpread = bidAkdSpread;
+            string tmpmsg1 = "current bidAkdSpread=" + string(c_bas) + ",lastABSSpread=" + string(c_lasts) +
+                    ",cul_times seting is available!!";
+            LogMsg *logmsg1 = new LogMsg();
+            logmsg1->setMsg(tmpmsg1);
+            logqueue.push(logmsg1);
+            cout<<tmpmsg1<<endl;
+            LOG(INFO)<<tmpmsg1;
             return;//avaialable
         }
         string s_msg;
@@ -1564,8 +1583,12 @@ void CTraderSpi::tradeParaProcess(){
             s_msg = "bidpst=" + string(c_realLongPstLimit) + ",askpst=" + string(c_realShortPstLimit) + ",spread=" + string(c_bss) +",<5,bidCulTimes is set from " +
                     string(c_bidCulTimes) + "to " + string(c_culTime) + ";askCulTimes is set from " + string(c_askCulTimes) + "to " + string(c_culTime);
         }
+        logmsg = new LogMsg();
+        logmsg->setMsg(s_msg);
+        logqueue.push(logmsg);
+        cout<<s_msg<<endl;
+        LOG(INFO)<<s_msg;
     }
-
 }
 
 //将投资者持仓信息写入文件保存
