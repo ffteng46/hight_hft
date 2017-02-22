@@ -65,6 +65,10 @@ int great_than_three_ask = 0;
 int bi=30;
 extern int realLongPstLimit;
 extern int realShortPstLimit;
+//卖出报单触发信号
+extern int askCulTimes;
+//买入报单触发信号
+extern int bidCulTimes;
 extern int pstalarm;
 double settlementPrice = 10;
 string sep = ";";
@@ -436,7 +440,7 @@ void OnRtnSHFEMarketData(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
     char c_upcul[5]={'\0'};
     char c_downcul[5]={'\0'};
     char c_price[20]={'\0'};
-    if(up_culculate >= cul_times){
+    if(up_culculate >= askCulTimes){
         //sell
         char char_orderdir[] = "1";
         //开平判断
@@ -470,7 +474,7 @@ void OnRtnSHFEMarketData(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
         LogMsg *tradeMsg = new LogMsg();
         tradeMsg->setMsg(string(c_msg));
         logqueue.push(tradeMsg);
-    }else if(down_culculate >= cul_times){
+    }else if(down_culculate >= bidCulTimes){
         //买
         char char_orderdir[] = "0";
         //开平判断
