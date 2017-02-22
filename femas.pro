@@ -27,6 +27,7 @@ HEADERS += \
     DemoUtils.h \
     USTPFtdcTraderApi.h \
     USTPFtdcUserApiDataType.h \
-    USTPFtdcUserApiStruct.h
+    USTPFtdcUserApiStruct.h \
+    PublicFuncs.h
 
 

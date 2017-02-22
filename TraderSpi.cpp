@@ -1,4 +1,4 @@
-﻿// TraderSpi.cpp: implementation of the CTraderSpi class.
+// TraderSpi.cpp: implementation of the CTraderSpi class.
 //
 //////////////////////////////////////////////////////////////////////
 
@@ -63,6 +63,9 @@ int start_process = 0;
 int realLongPstLimit = 0;
 int realShortPstLimit = 0;
 int lastABSSpread = 0;
+extern TUstpFtdcBrokerIDType  BROKER_ID;				// 经纪公司代码
+extern TUstpFtdcUserIDType INVESTOR_ID;			// 投资者代码
+extern TUstpFtdcPasswordType  PASSWORD ;			// 用户密码
 CTraderSpi::CTraderSpi(CUstpFtdcTraderApi *pTrader):m_pUserApi(pTrader)
 {
 
@@ -106,7 +109,7 @@ int CTraderSpi::md_orderinsert(double price,char *dir,char *offset,char * ins,in
     strcpy(req.InstrumentID, ins);
     //cout<<"instrumentid="<<string(req.InstrumentID)<<endl;
     ///报单引用
-    sprintf(req.UserOrderLocalID,"%012d",++g_nOrdLocalID);
+    sprintf(req.UserOrderLocalID,"%d",++g_nOrdLocalID);
     //strcpy(req.UserOrderLocalID, UserOrderLocalID);
    // cout<<"3"<<endl;
     ///用户代码
@@ -184,7 +187,7 @@ int CTraderSpi::md_orderinsert(double price,char *dir,char *offset,char * ins,in
 //    seq_map_g_nOrdLocalID[str_osk] = tmpmap;
     //委托类操作，使用客户端定义的请求编号格式
     //cout<<"order"<<endl;
-    int iResult = pUserApi->ReqOrderInsert(&req,++g_nOrdLocalID);
+    int iResult = pUserApi->ReqOrderInsert(&req,++iRequestID);
     cerr << "--->>> ReqOrderInsert:" << ((iResult == 0) ? "success" : "failed") << endl;
 //    string msg = "order_requestid=" + string(char_order_index) + ";orderinsert_requestid=" + string(char_query_index);
 //    //LogMsg lmsg;
@@ -221,7 +224,7 @@ void CTraderSpi::ReqUserLogin()
     strcpy(reqUserLogin.UserID, INVESTOR_ID);
     strcpy(reqUserLogin.Password, PASSWORD);
     strcpy(reqUserLogin.UserProductInfo,"");
-    int iResult = pUserApi->ReqUserLogin(&reqUserLogin, ++g_nOrdLocalID);
+    int iResult = pUserApi->ReqUserLogin(&reqUserLogin, ++iRequestID);
     printf("请求登录，BrokerID=[%s]UserID=[%s]\n",BROKER_ID,INVESTOR_ID);
     cerr << "--->>> 发送用户登录请求: " << ((iResult == 0) ? "成功" : "失败") << endl;
 #ifdef WIN32
@@ -262,7 +265,7 @@ void CTraderSpi::OnRspUserLogin(CUstpFtdcRspUserLoginField *pRspUserLogin, CUstp
     if (bIsLast && !IsErrorRspInfo(pRspInfo))
     //if (pRspInfo!=NULL&&pRspInfo->ErrorID!=0)
 	{
-        g_nOrdLocalID=atoi(pRspUserLogin->MaxOrderLocalID)+10000;
+        g_nOrdLocalID=atoi(pRspUserLogin->MaxOrderLocalID)+900000;
         printf("-----------------------------\n");
         printf("登录成功，最大本地报单号:%d\n",g_nOrdLocalID);
         printf("-----------------------------\n");
@@ -292,7 +295,7 @@ void CTraderSpi::ReqInvestorAccount(){
     memset(&QryInvestorAcc,0,sizeof(CUstpFtdcQryInvestorAccountField));
     strcpy(QryInvestorAcc.BrokerID,BROKER_ID);
     strcpy(QryInvestorAcc.InvestorID,INVESTOR_ID);
-    int iResult =  pUserApi->ReqQryInvestorAccount(&QryInvestorAcc,++g_nOrdLocalID);
+    int iResult =  pUserApi->ReqQryInvestorAccount(&QryInvestorAcc,++iRequestID);
     char char_rst[10] = {'\0'};
     sprintf(char_rst,"%d",iResult);
     cerr << "--->>> 请求查询投资者account: " << ((iResult == 0) ? "成功" : "失败")<<",result="<<char_rst << endl;
@@ -314,7 +317,7 @@ void CTraderSpi::ReqQryInvestorPosition()
     strcpy(req.BrokerID, BROKER_ID);
     strcpy(req.InvestorID, INVESTOR_ID);
     //strcpy(req.InstrumentID, INSTRUMENT_ID);
-    int iResult = pUserApi->ReqQryInvestorPosition(&req, ++g_nOrdLocalID);
+    int iResult = pUserApi->ReqQryInvestorPosition(&req, ++iRequestID);
     char char_rst[10] = {'\0'};
     sprintf(char_rst,"%d",iResult);
     cerr << "--->>> 请求查询投资者持仓: " << ((iResult == 0) ? "成功" : "失败")<<",result="<<char_rst << endl;
@@ -528,7 +531,7 @@ void CTraderSpi::ReqQryInstrument(char *instrumentid)
     memset(&req, 0, sizeof(req));
     strcpy(req.InstrumentID, instrumentid);
     //strcpy(req.ExchangeID,"SHFE");
-    int iResult = pUserApi->ReqQryInstrument(&req, ++g_nOrdLocalID);
+    int iResult = pUserApi->ReqQryInstrument(&req, ++iRequestID);
     char char_rst[10] = {'\0'};
     sprintf(char_rst,"%d",iResult);
     cerr << "--->>> 请求查询合约: " << ((iResult == 0) ? "成功" : "失败") <<",result="<<char_rst<< endl;
@@ -1134,7 +1137,7 @@ bool CTraderSpi::IsErrorRspInfo(CUstpFtdcRspInfoField *pRspInfo)
     if (bResult){
         string errmsg =pRspInfo->ErrorMsg;
         if(pRspInfo->ErrorID == 12){//重复的ref
-            g_nOrdLocalID += 10000;
+            g_nOrdLocalID += 1000;
             cerr << "--->>> ErrorID=" << pRspInfo->ErrorID << ", ErrorMsg=" << errmsg <<",g_nOrdLocalID增加="<<g_nOrdLocalID<<endl;
             sprintf(char_msg, "--->>> ErrorID=%d,ErrorMsg=%s,g_nOrdLocalID增加=%d",pRspInfo->ErrorID,  boosttoolsnamespace::CBoostTools::gbktoutf8(pRspInfo->ErrorMsg),g_nOrdLocalID);
 
@@ -1427,6 +1430,7 @@ int CTraderSpi::processtrade(CUstpFtdcTradeField *pTrade)
 //            }
 //        }
     }
+    tradeParaProcess();
     string tmpmsg;
     for(unordered_map<string,unordered_map<string,int>>::iterator it=positionmap.begin();it != positionmap.end();it ++){
         tmpmsg.append(it->first).append("持仓情况:");
