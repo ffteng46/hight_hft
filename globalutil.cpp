@@ -470,9 +470,10 @@ void OnRtnSHFEMarketData(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
         sprintf(c_downcul,"%d",down_culculate);
         sprintf(c_msg,"order: instrumentid=%s,direction=%s,offsetflag=%s,price=%s,up_culculate=%s,down_culculate=%s",
                 singleInstrument,char_orderdir,char_orderoffset,c_price,c_upcul,c_downcul);
-        LOG(INFO)<<string(c_msg);
+        string com_str = string(c_msg) + ";" + marketdata;
+        LOG(INFO)<<com_str;
         LogMsg *tradeMsg = new LogMsg();
-        tradeMsg->setMsg(string(c_msg));
+        tradeMsg->setMsg(com_str);
         logqueue.push(tradeMsg);
     }else if(down_culculate >= bidCulTimes){
         //Âò
@@ -506,9 +507,10 @@ void OnRtnSHFEMarketData(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
 
         sprintf(c_msg,"order: instrumentid=%s,direction=%s,offsetflag=%s,price=%s,up_culculate=%s,down_culculate=%s",
                 singleInstrument,char_orderdir,char_orderoffset,c_price,c_upcul,c_downcul);
-        LOG(INFO)<<string(c_msg);
+        string com_str = string(c_msg) + ";" + marketdata;
+        LOG(INFO)<<com_str;
         LogMsg *tradeMsg = new LogMsg();
-        tradeMsg->setMsg(string(c_msg));
+        tradeMsg->setMsg(com_str);
         logqueue.push(tradeMsg);
     }
 

@@ -265,7 +265,10 @@ void CTraderSpi::OnRspUserLogin(CUstpFtdcRspUserLoginField *pRspUserLogin, CUstp
     if (bIsLast && !IsErrorRspInfo(pRspInfo))
     //if (pRspInfo!=NULL&&pRspInfo->ErrorID!=0)
 	{
-        g_nOrdLocalID=atoi(pRspUserLogin->MaxOrderLocalID)+900000;
+        g_nOrdLocalID=atoi(pRspUserLogin->MaxOrderLocalID);
+        if(g_nOrdLocalID < 90000000){
+            g_nOrdLocalID += 90000000;
+        }
         printf("-----------------------------\n");
         printf("登录成功，最大本地报单号:%d\n",g_nOrdLocalID);
         printf("-----------------------------\n");
@@ -1471,6 +1474,8 @@ void CTraderSpi::tradeParaProcess(){
         string tmpmsg;
         realShortPstLimit = map_iterator->second["shortTotalPosition"];
         realLongPstLimit = map_iterator->second["longTotalPosition"];
+        int shortYdPst = map_iterator->second["shortYdPosition"];
+        int longYdPst = map_iterator->second["longYdPosition"];
         // buy or open judge
         if(realLongPstLimit > longpstlimit){ //多头超过持仓限额，且必须空头有持仓才能多头平仓
             char char_limit[10] = {'\0'};
@@ -1482,6 +1487,11 @@ void CTraderSpi::tradeParaProcess(){
                 //LOG(INFO)<<tmpmsg;
             }else{
                 longPstIsClose = 2;
+                if(shortYdPst > 0){//privious to close yesterday position
+                    long_offset_flag = 4;
+                }else{
+                    long_offset_flag = 3;
+                }
                 tmpmsg.append("多头持仓量=");
                 tmpmsg.append(char_limit).append("大于longpstlimit,and realShortPstLimit is not zero,修改为多头平仓");
                 //LOG(INFO)<<tmpmsg;
@@ -1496,6 +1506,11 @@ void CTraderSpi::tradeParaProcess(){
                 //LOG(INFO)<<tmpmsg;
             }else{
                 shortPstIsClose = 2;
+                if(longYdPst > 0){//privious to close yesterday position
+                    short_offset_flag = 4;
+                }else{
+                    short_offset_flag = 3;
+                }
                 tmpmsg.append("空头持仓量=");
                 tmpmsg.append(char_limit).append("大于shortpstlimit,and realLongPstLimit is not zero,修改为空头平仓");
                 //LOG(INFO)<<tmpmsg;
