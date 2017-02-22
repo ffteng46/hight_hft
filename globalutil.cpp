@@ -449,8 +449,14 @@ void OnRtnSHFEMarketData(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
         //cout<<"sell"<<endl;
 
         if(isTest == 1){
-            sprintf(c_price,"%f",askPrice);
-            pUserSpi->md_orderinsert(askPrice,char_orderdir,char_orderoffset,instrumentID,default_volume);
+            double orderpirce = 0;
+            if((askPrice - tick) > bidPrice){
+                orderpirce = askPrice - tick;
+            }else{
+                orderpirce = bidPrice;
+            }
+            sprintf(c_price,"%f",orderpirce);
+            pUserSpi->md_orderinsert(orderpirce,char_orderdir,char_orderoffset,instrumentID,default_volume);
         }else if(isTest == 2){
             sprintf(c_price,"%f",max_price);
             pUserSpi->md_orderinsert(max_price,char_orderdir,char_orderoffset,instrumentID,default_volume);
@@ -477,8 +483,15 @@ void OnRtnSHFEMarketData(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
         //cout<<"buy"<<endl;
 
         if(isTest == 1){
-            sprintf(c_price,"%f",bidPrice);
-            pUserSpi->md_orderinsert(bidPrice,char_orderdir,char_orderoffset,instrumentID,default_volume);
+            double orderpirce = 0;
+
+            if((bidPrice + tick) < askPrice){
+                orderpirce = bidPrice + tick;
+            }else{
+                orderpirce = askPrice;
+            }
+            sprintf(c_price,"%f",orderpirce);
+            pUserSpi->md_orderinsert(orderpirce,char_orderdir,char_orderoffset,instrumentID,default_volume);
         }else if(isTest == 2){
             sprintf(c_price,"%f",min_price);
             pUserSpi->md_orderinsert(min_price,char_orderdir,char_orderoffset,instrumentID,default_volume);
