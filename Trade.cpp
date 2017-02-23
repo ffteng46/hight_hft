@@ -261,7 +261,7 @@ void TradeProcess::initThread(int sendtype)
 {
     printf("经纪公司编号=[%s]\n","pInvestorMargin->BrokerID");
     thread_log_group.create_thread(marketdataEngine);
-    thread_log_group.create_thread(logEngine);
+    //thread_log_group.create_thread(logEngine);
     //thread_log_group.create_thread(create);
 //    thread_log_group.create_thread(test);
     //thread_log_group.create_thread(marketdataEngine);

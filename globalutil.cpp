@@ -57,7 +57,8 @@ unsigned int trade_num = 0;
 int trade_default[4]={3,6,9,12};
 //持仓比
 int trade_bi[1];
-
+//mkdate count
+unsigned long int mkdatacount = 0;
 int bidpst=0;
 int askpst=0;
 int great_than_three_bid = 0;
@@ -244,10 +245,10 @@ void initPriceGap(){
 //            gap_list[0] = down_gap;
 //            gap_list[1] = up_gap;
             map_price_gap[tmp_price] = gap_list;
-            char c_tmp[100];
-            sprintf(c_tmp,"price=%f down=%f up=%f",tmp_price,gap_list[0],gap_list[1]);
-            cout<<c_tmp<<endl;
-            LOG(INFO) << c_tmp;
+            //char c_tmp[100];
+            //sprintf(c_tmp,"price=%f down=%f up=%f",tmp_price,gap_list[0],gap_list[1]);
+            //cout<<c_tmp<<endl;
+            //LOG(INFO) << c_tmp;
         }else{
             break;
         }
@@ -270,13 +271,13 @@ void OnRtnSHFEMarketData(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
         //cout<<"want instrumentid="<<singleInstrument<<",actual instrumentid="<<instrumentID<<endl;
         string msg;
         char c_msg[300];
-        sprintf(c_msg,"want instrumentid=%s,actual instrumentid=%s",singleInstrument,instrumentID);
-        LOG(INFO)<<string(c_msg);
+//        sprintf(c_msg,"want instrumentid=%s,actual instrumentid=%s",singleInstrument,instrumentID);
+//        LOG(INFO)<<string(c_msg);
         return;
     }else{
         char c_p[20];
         sprintf(c_p,"%f",pDepthMarketData->LastPrice);
-        cout<<"actual instrumentid="<<instrumentID<<",price="<<string(c_p)<<endl;
+        //cout<<"actual instrumentid="<<instrumentID<<",price="<<string(c_p)<<endl;
     }
     TXeleMdFtdcMillisecType UpdateMillisec = pDepthMarketData->UpdateMillisec;
     TXeleMdFtdcVolumeType Volume = pDepthMarketData->Volume;
@@ -295,6 +296,12 @@ void OnRtnSHFEMarketData(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
     TXeleMdFtdcPriceType askPrice = pDepthMarketData->AskPrice;
 //    TXeleMdFtdcVolumeType BidVolume = pDepthMarketData->BidVolume;
 //    TXeleMdFtdcVolumeType AskVolume = pDepthMarketData->AskVolume;
+    ss << mkdatacount++;
+    string str_mkdatacount;
+    ss >> str_mkdatacount;
+    marketdata.append("seq=");
+    marketdata.append(str_mkdatacount);
+    marketdata.append(sep);
     ///最后修改时间
     TXeleMdFtdcTimeType UpdateTime;
     strcpy(UpdateTime, pDepthMarketData->UpdateTime);
@@ -414,9 +421,9 @@ void OnRtnSHFEMarketData(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
     char c_last_gap[20];
     sprintf(c_last_gap,"%f",last_gap);
     char tmp_msg[256];
-    sprintf(tmp_msg,"currPrice=%s,prePrice=%s,currGap=%s,lastGap=%s",c_lastp,c_pre_p,c_cur_gap,c_last_gap);
+    //sprintf(tmp_msg,"currPrice=%s,prePrice=%s,currGap=%s,lastGap=%s",c_lastp,c_pre_p,c_cur_gap,c_last_gap);
     //cout<<tmp_msg<<endl;
-    LOG(INFO)<<string(tmp_msg);
+    //LOG(INFO)<<string(tmp_msg);
     previous_price = lastPrice;
     if(last_gap == -1){
         last_gap = gap;
@@ -432,6 +439,9 @@ void OnRtnSHFEMarketData(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
         down_culculate += 1;
         up_culculate = 0;
     }
+    sprintf(tmp_msg,"currPrice=%s,prePrice=%s,up_culculate=%d,askCulTimes=%d,down_culculate=%d,bidCulTimes=%d",c_lastp,c_pre_p,up_culculate,askCulTimes,down_culculate,bidCulTimes);
+    LOG(INFO)<<string(tmp_msg);
+    cout<<tmp_msg<<endl;
     //开平
     char char_orderoffset[3]={'\0'};
     string orderoffset;
@@ -468,8 +478,8 @@ void OnRtnSHFEMarketData(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
         char c_msg[300];
         sprintf(c_upcul,"%d",up_culculate);
         sprintf(c_downcul,"%d",down_culculate);
-        sprintf(c_msg,"order: instrumentid=%s,direction=%s,offsetflag=%s,price=%s,up_culculate=%s,down_culculate=%s",
-                singleInstrument,char_orderdir,char_orderoffset,c_price,c_upcul,c_downcul);
+        sprintf(c_msg,"order: instrumentid=%s,direction=%s,offsetflag=%s,price=%s,askCulTimes=%d,up_culculate=%s,down_culculate=%s",
+                singleInstrument,char_orderdir,char_orderoffset,c_price,askCulTimes,c_upcul,c_downcul);
         string com_str = string(c_msg) + ";" + marketdata;
         LOG(INFO)<<com_str;
         LogMsg *tradeMsg = new LogMsg();
@@ -505,8 +515,8 @@ void OnRtnSHFEMarketData(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
         sprintf(c_upcul,"%d",up_culculate);
         sprintf(c_downcul,"%d",down_culculate);
 
-        sprintf(c_msg,"order: instrumentid=%s,direction=%s,offsetflag=%s,price=%s,up_culculate=%s,down_culculate=%s",
-                singleInstrument,char_orderdir,char_orderoffset,c_price,c_upcul,c_downcul);
+        sprintf(c_msg,"order: instrumentid=%s,direction=%s,offsetflag=%s,price=%s,bidCulTimes=%d,up_culculate=%s,down_culculate=%s",
+                singleInstrument,char_orderdir,char_orderoffset,c_price,bidCulTimes,c_upcul,c_downcul);
         string com_str = string(c_msg) + ";" + marketdata;
         LOG(INFO)<<com_str;
         LogMsg *tradeMsg = new LogMsg();

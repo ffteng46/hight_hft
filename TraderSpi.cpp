@@ -1,4 +1,4 @@
-// TraderSpi.cpp: implementation of the CTraderSpi class.
+﻿// TraderSpi.cpp: implementation of the CTraderSpi class.
 //
 //////////////////////////////////////////////////////////////////////
 
@@ -33,6 +33,10 @@ extern int short_offset_flag;
 extern int askCulTimes;
 //买入报单触发信号
 extern int bidCulTimes;
+//上涨
+extern int up_culculate;
+//下跌
+extern int down_culculate;
 //报单触发信号
 extern int cul_times;
 extern int limit_volume;
@@ -1345,7 +1349,14 @@ int CTraderSpi::processtrade(CUstpFtdcTradeField *pTrade)
             }else if(str_offset == "4"){//平昨
                 int tmp_tdpst = map_iterator->second["shortTdPosition"];
                 int tmp_ydpst = map_iterator->second["shortYdPosition"];
+                if(tmp_ydpst == 0){
+                    char c_err[100];
+                    sprintf(c_err,"shortYdPosition is zero!!!,please check this rtn trade.");
+                    cout<<c_err<<endl;
+                    LOG(INFO)<<c_err;
+                }
                 tmp_ydpst = tmp_ydpst - pTrade->TradeVolume;
+
                 realShortPstLimit = tmp_ydpst + tmp_tdpst;
                 map_iterator->second["shortYdPosition"] = tmp_ydpst;
                 map_iterator->second["shortTotalPosition"] = realShortPstLimit;
@@ -1395,6 +1406,12 @@ int CTraderSpi::processtrade(CUstpFtdcTradeField *pTrade)
             }else if(str_offset == "4"){//平昨
                 int tmp_tdpst = map_iterator->second["longTdPosition"];
                 int tmp_ydpst = map_iterator->second["longYdPosition"];
+                if(tmp_ydpst == 0){
+                    char c_err[100];
+                    sprintf(c_err,"longYdPosition is zero!!!,please check this rtn trade.");
+                    cout<<c_err<<endl;
+                    LOG(INFO)<<c_err;
+                }
                 tmp_ydpst = tmp_ydpst - pTrade->TradeVolume;
                 realLongPstLimit = tmp_ydpst + tmp_tdpst;
                 map_iterator->second["longYdPosition"] = tmp_ydpst;
@@ -1405,35 +1422,6 @@ int CTraderSpi::processtrade(CUstpFtdcTradeField *pTrade)
                 }
             }
         }
-//        if(realLongPstLimit > longpstlimit){ //多头超过持仓限额，且必须空头有持仓才能多头平仓
-//            char char_limit[10] = {'\0'};
-//            sprintf(char_limit,"%d",realLongPstLimit);
-//            if(realShortPstLimit == 0){
-//                longPstIsClose = 1;
-//                string tmpmsg= "多头持仓量=";
-//                tmpmsg.append(char_limit).append("大于longpstlimit,but realShortPstLimit is zero,仍然为多头开仓");
-//                LOG(INFO)<<tmpmsg;
-//            }else{
-//                longPstIsClose = 2;
-//                string tmpmsg= "多头持仓量=";
-//                tmpmsg.append(char_limit).append("大于longpstlimit,and realShortPstLimit is not zero,修改为多头平仓");
-//                LOG(INFO)<<tmpmsg;
-//            }
-//        }else if(realShortPstLimit > shortpstlimit){//空头开平仓判断
-//            char char_limit[10] = {'\0'};
-//            sprintf(char_limit,"%d",realShortPstLimit);
-//            if(realLongPstLimit == 0){
-//                shortPstIsClose = 1;
-//                string tmpmsg= "空头持仓量=";
-//                tmpmsg.append(char_limit).append("大于shortpstlimit,but realLongPstLimit is zero,仍然为空头开仓");
-//                LOG(INFO)<<tmpmsg;
-//            }else{
-//                shortPstIsClose = 2;
-//                string tmpmsg= "空头持仓量=";
-//                tmpmsg.append(char_limit).append("大于shortpstlimit,and realLongPstLimit is not zero,修改为空头平仓");
-//                LOG(INFO)<<tmpmsg;
-//            }
-//        }
     }
     tradeParaProcess();
     string tmpmsg;
@@ -1466,9 +1454,9 @@ int CTraderSpi::processtrade(CUstpFtdcTradeField *pTrade)
     }
     cout<<tmpmsg<<endl;
     LOG(INFO)<<tmpmsg;
-    LogMsg *logmsg = new LogMsg();
-    logmsg->setMsg(tmpmsg);
-    logqueue.push(logmsg);
+//    LogMsg *logmsg = new LogMsg();
+//    logmsg->setMsg(tmpmsg);
+//    logqueue.push(logmsg);
     return 0;
 }
 void CTraderSpi::tradeParaProcess(){
@@ -1518,9 +1506,9 @@ void CTraderSpi::tradeParaProcess(){
                 //LOG(INFO)<<tmpmsg;
             }
         }
-        LogMsg *logmsg = new LogMsg();
-        logmsg->setMsg(tmpmsg);
-        logqueue.push(logmsg);
+//        LogMsg *logmsg = new LogMsg();
+//        logmsg->setMsg(tmpmsg);
+//        logqueue.push(logmsg);
         cout<<tmpmsg<<endl;
         LOG(INFO)<<tmpmsg;
 
@@ -1535,9 +1523,9 @@ void CTraderSpi::tradeParaProcess(){
             lastABSSpread = bidAkdSpread;
             string tmpmsg1 = "current bidAkdSpread=" + string(c_bas) + ",lastABSSpread=" + string(c_lasts) +
                     ",cul_times seting is available!!";
-            LogMsg *logmsg1 = new LogMsg();
-            logmsg1->setMsg(tmpmsg1);
-            logqueue.push(logmsg1);
+//            LogMsg *logmsg1 = new LogMsg();
+//            logmsg1->setMsg(tmpmsg1);
+//            logqueue.push(logmsg1);
             cout<<tmpmsg1<<endl;
             LOG(INFO)<<tmpmsg1;
             return;//avaialable
@@ -1549,23 +1537,35 @@ void CTraderSpi::tradeParaProcess(){
         sprintf(c_bss,"%d",bidAkdSpread);
         sprintf(c_realShortPstLimit,"%d",realShortPstLimit);
         sprintf(c_realLongPstLimit,"%d",realLongPstLimit);
-        if(bidAkdSpread >= 5 && bidAkdSpread <10){
+        if(bidAkdSpread >= 3 && bidAkdSpread <10){
             lastABSSpread = bidAkdSpread;
             if(realShortPstLimit > realLongPstLimit){//increase ask(sell) spread
                 char c_pre_askCulTimes[10];
                 sprintf(c_pre_askCulTimes,"%d",askCulTimes);
                 askCulTimes += 1;
+                char c_asktimes[100];
+                if(up_culculate >= askCulTimes){
+                    int tmp_cul = ((4*askCulTimes)/5);
+                    sprintf(c_asktimes ,"up_culculate set from %d to %d;",up_culculate,tmp_cul);
+                    up_culculate = tmp_cul;
+                }
                 char c_after_askCulTimes[10];
                 sprintf(c_after_askCulTimes,"%d",askCulTimes);
-                s_msg = "bidpst=" + string(c_realLongPstLimit) + ",askpst=" + string(c_realShortPstLimit) + ",spread=" + string(c_bss) +",>=5 and <10,askCulTimes is set from " +
+                s_msg = string(c_asktimes) + "bidpst=" + string(c_realLongPstLimit) + ",askpst=" + string(c_realShortPstLimit) + ",spread=" + string(c_bss) +",>=5 and <10,askCulTimes is set from " +
                         string(c_pre_askCulTimes) + "to " + string(c_after_askCulTimes);
             }else{
                 char c_pre_bidCulTimes[10];
                 sprintf(c_pre_bidCulTimes,"%d",bidCulTimes);
                 bidCulTimes += 1;
+                char c_times[100];
+                if(down_culculate >= bidCulTimes){
+                    int tmp_cul = ((4*bidCulTimes)/5);
+                    sprintf(c_times,"down_culculate set from %d to %d;",down_culculate,tmp_cul);
+                    down_culculate = tmp_cul;
+                }
                 char c_after_bidCulTimes[10];
                 sprintf(c_after_bidCulTimes,"%d",bidCulTimes);
-                s_msg = "bidpst=" + string(c_realLongPstLimit) + ",askpst=" + string(c_realShortPstLimit) + ",spread=" + string(c_bss) +",>=5 and <10,bidCulTimes is set from " +
+                s_msg = string(c_times) +  "bidpst=" + string(c_realLongPstLimit) + ",askpst=" + string(c_realShortPstLimit) + ",spread=" + string(c_bss) +",>=5 and <10,bidCulTimes is set from " +
                         string(c_pre_bidCulTimes) + "to " + string(c_after_bidCulTimes);
 
             }
@@ -1575,17 +1575,29 @@ void CTraderSpi::tradeParaProcess(){
                 char c_pre_askCulTimes[10];
                 sprintf(c_pre_askCulTimes,"%d",askCulTimes);
                 askCulTimes += 2;
+                char c_asktimes[100];
+                if(up_culculate >= askCulTimes){
+                    int tmp_cul = ((4*askCulTimes)/5);
+                    sprintf(c_asktimes ,"up_culculate set from %d to %d;",up_culculate,tmp_cul);
+                    up_culculate = tmp_cul;
+                }
                 char c_after_askCulTimes[10];
                 sprintf(c_after_askCulTimes,"%d",askCulTimes);
-                s_msg = "bidpst=" + string(c_realLongPstLimit) + ",askpst=" + string(c_realShortPstLimit) + ",spread=" + string(c_bss) +",>=10,askCulTimes is set from " +
+                s_msg = string(c_asktimes) +  "bidpst=" + string(c_realLongPstLimit) + ",askpst=" + string(c_realShortPstLimit) + ",spread=" + string(c_bss) +",>=10,askCulTimes is set from " +
                         string(c_pre_askCulTimes) + "to " + string(c_after_askCulTimes);
             }else{
                 char c_pre_bidCulTimes[10];
                 sprintf(c_pre_bidCulTimes,"%d",bidCulTimes);
                 bidCulTimes += 2;
+                char c_times[100];
+                if(down_culculate >= bidCulTimes){
+                    int tmp_cul = ((4*bidCulTimes)/5);
+                    sprintf(c_times,"down_culculate set from %d to %d;",down_culculate,tmp_cul);
+                    down_culculate = tmp_cul;
+                }
                 char c_after_bidCulTimes[10];
                 sprintf(c_after_bidCulTimes,"%d",bidCulTimes);
-                s_msg = "bidpst=" + string(c_realLongPstLimit) + ",askpst=" + string(c_realShortPstLimit) + ",spread=" + string(c_bss) +",>=10,bidCulTimes is set from " +
+                s_msg = string(c_times) +  "bidpst=" + string(c_realLongPstLimit) + ",askpst=" + string(c_realShortPstLimit) + ",spread=" + string(c_bss) +",>=10,bidCulTimes is set from " +
                         string(c_pre_bidCulTimes) + "to " + string(c_after_bidCulTimes);
             }
         }else{
@@ -1600,9 +1612,9 @@ void CTraderSpi::tradeParaProcess(){
             s_msg = "bidpst=" + string(c_realLongPstLimit) + ",askpst=" + string(c_realShortPstLimit) + ",spread=" + string(c_bss) +",<5,bidCulTimes is set from " +
                     string(c_bidCulTimes) + "to " + string(c_culTime) + ";askCulTimes is set from " + string(c_askCulTimes) + "to " + string(c_culTime);
         }
-        logmsg = new LogMsg();
-        logmsg->setMsg(s_msg);
-        logqueue.push(logmsg);
+//        logmsg = new LogMsg();
+//        logmsg->setMsg(s_msg);
+//        logqueue.push(logmsg);
         cout<<s_msg<<endl;
         LOG(INFO)<<s_msg;
     }
