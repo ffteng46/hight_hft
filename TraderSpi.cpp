@@ -1,4 +1,4 @@
-﻿// TraderSpi.cpp: implementation of the CTraderSpi class.
+// TraderSpi.cpp: implementation of the CTraderSpi class.
 //
 //////////////////////////////////////////////////////////////////////
 
@@ -380,6 +380,8 @@ void CTraderSpi::OnRspQryInvestorPosition(CUstpFtdcRspInvestorPositionField *pRs
                 LOG(INFO)<<pst_msg;
             }
         }
+        //call tradeParaProcess method to set close or open
+        tradeParaProcess();
         cout<<"是否启动策略程序?0 否，1是"<<endl;
         cin>>isbeginmk;
         if(isbeginmk == 1){
