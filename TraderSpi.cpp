@@ -67,6 +67,8 @@ int start_process = 0;
 int realLongPstLimit = 0;
 int realShortPstLimit = 0;
 int lastABSSpread = 0;
+int firstGap = 2;
+int secondGap = 5;
 extern TUstpFtdcBrokerIDType  BROKER_ID;				// 经纪公司代码
 extern TUstpFtdcUserIDType INVESTOR_ID;			// 投资者代码
 extern TUstpFtdcPasswordType  PASSWORD ;			// 用户密码
@@ -385,7 +387,7 @@ void CTraderSpi::OnRspQryInvestorPosition(CUstpFtdcRspInvestorPositionField *pRs
             }
         }
         //call tradeParaProcess method to set close or open
-        tradeParaProcess();
+        tradeParaProcessTwo();
         cout<<"是否启动策略程序?0 否，1是"<<endl;
         cin>>isbeginmk;
         if(isbeginmk == 1){
@@ -1335,10 +1337,10 @@ int CTraderSpi::processtrade(CUstpFtdcTradeField *pTrade)
                 map_iterator->second["shortTdPosition"] = tmp_tdpst;
                 map_iterator->second["shortYdPosition"] = tmp_ydpst;
                 map_iterator->second["shortTotalPosition"] = realShortPstLimit;
-                if(tmp_ydpst == 0){//buy open
-                    longPstIsClose = 1;
-                    long_offset_flag = 1;
-                }
+//                if(tmp_ydpst == 0){//buy open
+//                    longPstIsClose = 1;
+//                    long_offset_flag = 1;
+//                }
             }else if(str_offset == "3"){//平今
                 int tmp_tdpst = map_iterator->second["shortTdPosition"];
                 int tmp_ydpst = map_iterator->second["shortYdPosition"];
@@ -1360,10 +1362,10 @@ int CTraderSpi::processtrade(CUstpFtdcTradeField *pTrade)
                 realShortPstLimit = tmp_ydpst + tmp_tdpst;
                 map_iterator->second["shortYdPosition"] = tmp_ydpst;
                 map_iterator->second["shortTotalPosition"] = realShortPstLimit;
-                if(tmp_ydpst == 0){
-                    longPstIsClose = 1;
-                    long_offset_flag = 1;
-                }
+//                if(tmp_ydpst == 0){
+//                    longPstIsClose = 1;
+//                    long_offset_flag = 1;
+//                }
             }
         }else if(str_dir == "1"){//卖
             if(str_offset == "0"){//卖开仓,空头增加
@@ -1392,10 +1394,10 @@ int CTraderSpi::processtrade(CUstpFtdcTradeField *pTrade)
                 map_iterator->second["longTdPosition"] = tmp_tdpst;
                 map_iterator->second["longYdPosition"] = tmp_ydpst;
                 map_iterator->second["longTotalPosition"] = realLongPstLimit;
-                if(tmp_ydpst == 0){//sell open
-                    shortPstIsClose = 1;
-                    short_offset_flag = 1;
-                }
+//                if(tmp_ydpst == 0){//sell open
+//                    shortPstIsClose = 1;
+//                    short_offset_flag = 1;
+//                }
             }else if(str_offset == "3"){//平今
                 int tmp_tdpst = map_iterator->second["longTdPosition"];
                 int tmp_ydpst = map_iterator->second["longYdPosition"];
@@ -1416,14 +1418,14 @@ int CTraderSpi::processtrade(CUstpFtdcTradeField *pTrade)
                 realLongPstLimit = tmp_ydpst + tmp_tdpst;
                 map_iterator->second["longYdPosition"] = tmp_ydpst;
                 map_iterator->second["longTotalPosition"] = realLongPstLimit;
-                if(tmp_ydpst == 0){//sell open
-                    shortPstIsClose = 1;
-                    short_offset_flag = 1;
-                }
+//                if(tmp_ydpst == 0){//sell open
+//                    shortPstIsClose = 1;
+//                    short_offset_flag = 1;
+//                }
             }
         }
     }
-    tradeParaProcess();
+    tradeParaProcessTwo();
     string tmpmsg;
     for(unordered_map<string,unordered_map<string,int>>::iterator it=positionmap.begin();it != positionmap.end();it ++){
         tmpmsg.append(it->first).append("持仓情况:");
@@ -1619,7 +1621,66 @@ void CTraderSpi::tradeParaProcess(){
         LOG(INFO)<<s_msg;
     }
 }
-
+void CTraderSpi::tradeParaProcessTwo(){
+    for(unordered_map<string,unordered_map<string,int>>::iterator map_iterator=positionmap.begin();map_iterator != positionmap.end();map_iterator ++){
+        string tmpmsg;
+        realShortPstLimit = map_iterator->second["shortTotalPosition"];
+        realLongPstLimit = map_iterator->second["longTotalPosition"];
+        int shortYdPst = map_iterator->second["shortYdPosition"];
+        int longYdPst = map_iterator->second["longYdPosition"];
+        if(longYdPst > 0){
+            shortPstIsClose = 2;
+            short_offset_flag = 4;
+        }
+        if(shortYdPst > 0){
+            longPstIsClose = 2;
+            long_offset_flag = 4;
+        }
+        // buy or open judge
+        if(realLongPstLimit > longpstlimit){ //多头超过持仓限额，且必须空头有持仓才能多头平仓
+            char char_limit[10] = {'\0'};
+            sprintf(char_limit,"%d",realLongPstLimit);
+            longPstIsClose = 11;//long can not to open new position
+            tmpmsg.append("多头持仓量=");
+            tmpmsg.append(char_limit).append("大于longpstlimit,long can not to open new position");
+        }else if(realShortPstLimit > shortpstlimit){//空头开平仓判断
+            char char_limit[10] = {'\0'};
+            sprintf(char_limit,"%d",realShortPstLimit);
+            shortPstIsClose = 11;
+            tmpmsg.append("空头持仓量=");
+            tmpmsg.append(char_limit).append("大于shortpstlimit,short can not to open new position");
+        }
+        cout<<tmpmsg<<endl;
+        LOG(INFO)<<tmpmsg;
+        //spread set
+        int bidAkdSpread = abs(realShortPstLimit - realLongPstLimit);
+        if(bidAkdSpread >= firstGap && bidAkdSpread < secondGap && realShortPstLimit  > realLongPstLimit){
+            bidCulTimes += 2;
+            if(down_culculate >= bidCulTimes){
+                down_culculate = (4*down_culculate)/5;
+            }
+        }else if(bidAkdSpread >= secondGap && realShortPstLimit > realLongPstLimit){
+            bidCulTimes += 4;
+            if(down_culculate >= bidCulTimes){
+                down_culculate = (4*down_culculate)/5;
+            }
+        }else if(bidAkdSpread >= firstGap && bidAkdSpread < secondGap && realShortPstLimit < realLongPstLimit){
+            askCulTimes += 2;
+            if(up_culculate >= askCulTimes){
+                up_culculate = (4*up_culculate)/5;
+            }
+        }else if(bidAkdSpread >= secondGap && realShortPstLimit < realLongPstLimit){
+            askCulTimes += 4;
+            if(up_culculate >= askCulTimes){
+                up_culculate = (4*up_culculate)/5;
+            }
+        }else{
+            bidCulTimes = cul_times;
+            askCulTimes = cul_times;
+        }
+        lastABSSpread = bidAkdSpread;
+    }
+}
 //将投资者持仓信息写入文件保存
 int CTraderSpi::storeInvestorPosition(CUstpFtdcRspInvestorPositionField *pInvestorPosition)
 {

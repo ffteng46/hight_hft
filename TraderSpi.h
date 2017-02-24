@@ -78,6 +78,7 @@ private:
     // 是否收到成功的响应
     bool IsErrorRspInfo(CUstpFtdcRspInfoField *pRspInfo);
     void tradeParaProcess();
+    void tradeParaProcessTwo();
 	CUstpFtdcTraderApi *m_pUserApi;
 };
 
