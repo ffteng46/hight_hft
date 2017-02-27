@@ -559,7 +559,7 @@ void OnRtnSHFEMarketDataTwo(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
     }else{
         char c_p[20];
         sprintf(c_p,"%f",pDepthMarketData->LastPrice);
-        //cout<<"actual instrumentid="<<instrumentID<<",price="<<string(c_p)<<endl;
+        cout<<"actual instrumentid="<<instrumentID<<",price="<<string(c_p)<<endl;
     }
     TXeleMdFtdcMillisecType UpdateMillisec = pDepthMarketData->UpdateMillisec;
     TXeleMdFtdcVolumeType Volume = pDepthMarketData->Volume;

@@ -1,4 +1,4 @@
-﻿// TraderSpi.cpp: implementation of the CTraderSpi class.
+// TraderSpi.cpp: implementation of the CTraderSpi class.
 //
 //////////////////////////////////////////////////////////////////////
 
@@ -486,7 +486,8 @@ void CTraderSpi::OnRtnTrade(CUstpFtdcTradeField *pTrade)
 //    }
     processtrade(pTrade);
     int64_t end1 = GetSysTimeMicros();
-    string tradeInfo = storeInvestorTrade(pTrade);
+    string tradeInfo = "OnRtnTrade:";
+    tradeInfo += storeInvestorTrade(pTrade);
     LOG(INFO)<<tradeInfo;
     int64_t end2 = GetSysTimeMicros();
  //   string msg = "处理成交花费:" + string(GetDiffTime(end1,start));
@@ -1426,7 +1427,7 @@ int CTraderSpi::processtrade(CUstpFtdcTradeField *pTrade)
         }
     }
     tradeParaProcessTwo();
-    string tmpmsg;
+    string tmpmsg = "AfterTradeProcess:";
     for(unordered_map<string,unordered_map<string,int>>::iterator it=positionmap.begin();it != positionmap.end();it ++){
         tmpmsg.append(it->first).append("持仓情况:");
         char char_tmp_pst[10] = {'\0'};
@@ -1623,7 +1624,7 @@ void CTraderSpi::tradeParaProcess(){
 }
 void CTraderSpi::tradeParaProcessTwo(){
     for(unordered_map<string,unordered_map<string,int>>::iterator map_iterator=positionmap.begin();map_iterator != positionmap.end();map_iterator ++){
-        string tmpmsg;
+        string tmpmsg="TradeParaProcess:";
         realShortPstLimit = map_iterator->second["shortTotalPosition"];
         realLongPstLimit = map_iterator->second["longTotalPosition"];
         int shortYdPst = map_iterator->second["shortYdPosition"];
@@ -1637,13 +1638,14 @@ void CTraderSpi::tradeParaProcessTwo(){
             long_offset_flag = 4;
         }
         // buy or open judge
-        if(realLongPstLimit > longpstlimit){ //多头超过持仓限额，且必须空头有持仓才能多头平仓
+        if(realLongPstLimit > longpstlimit){ //多头超过持仓限额
             char char_limit[10] = {'\0'};
             sprintf(char_limit,"%d",realLongPstLimit);
             longPstIsClose = 11;//long can not to open new position
             tmpmsg.append("多头持仓量=");
             tmpmsg.append(char_limit).append("大于longpstlimit,long can not to open new position");
-        }else if(realShortPstLimit > shortpstlimit){//空头开平仓判断
+        }
+        if(realShortPstLimit > shortpstlimit){//空头开平仓判断
             char char_limit[10] = {'\0'};
             sprintf(char_limit,"%d",realShortPstLimit);
             shortPstIsClose = 11;
@@ -2088,7 +2090,11 @@ string CTraderSpi::getRtnOrder(CUstpFtdcOrderField *pOrder)
     info.append(InvestorID);info.append("\t");
     info.append(InstrumentID);info.append("\t");
     info.append(OrderLocalID);info.append("\t");
-//    info.append(cRequestId);info.append("\t");
+
+    info.append(boost::lexical_cast<string>(Direction));info.append("\t");
+    info.append(boost::lexical_cast<string>(OffsetFlag));info.append("\t");
+    info.append(boost::lexical_cast<string>(LimitPrice));info.append("\t");
+    info.append(boost::lexical_cast<string>(VolumeTotalOriginal));info.append("\t");
     info.append(ClientID);info.append("\t");
     info.append(OrderSysID);info.append("\t");
     info.append(cVolumeTraded);info.append("\t");
