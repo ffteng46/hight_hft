@@ -553,20 +553,21 @@ void OnRtnSHFEMarketDataTwo(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
     stringstream ss;
     char instrumentID[17] = {'\0'};
     strcpy(instrumentID,pDepthMarketData->Instrument);
+    TXeleMdFtdcPriceType lastPrice = pDepthMarketData->LastPrice;
     int com = strcmp(singleInstrument,instrumentID);
     if(com != 0){
         return;
     }else{
         char c_p[20];
-        sprintf(c_p,"%f",pDepthMarketData->LastPrice);
+        sprintf(c_p,"%f",lastPrice);
         cout<<"actual instrumentid="<<instrumentID<<",price="<<string(c_p)<<endl;
     }
     TXeleMdFtdcMillisecType UpdateMillisec = pDepthMarketData->UpdateMillisec;
     TXeleMdFtdcVolumeType Volume = pDepthMarketData->Volume;
-    TXeleMdFtdcPriceType lastPrice = pDepthMarketData->LastPrice;
-    char buf[10];
-    sprintf(buf, "%.2f", lastPrice);
-    sscanf(buf, "%lf", &lastPrice);
+
+//    char buf[10];
+//    sprintf(buf, "%.2f", lastPrice);
+//    sscanf(buf, "%lf", &lastPrice);
 
     TXeleMdFtdcMoneyType Turnover = pDepthMarketData->Turnover;
     TXeleMdFtdcLargeVolumeType OpenInterest = pDepthMarketData->OpenInterest;
@@ -588,7 +589,7 @@ void OnRtnSHFEMarketDataTwo(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
     ///申买价一
     marketdata.append("BidPrice1=");
     char char_BidPrice[30] = {'\0'};
-    sprintf(char_BidPrice,"%f",pDepthMarketData->BidPrice);
+    sprintf(char_BidPrice,"%f",bidPrice);
     marketdata.append(char_BidPrice);
     marketdata.append(sep);
     ///申买量一
@@ -600,7 +601,7 @@ void OnRtnSHFEMarketDataTwo(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
     ///申卖价一
     marketdata.append("AskPrice1=");
     char char_AskPrice1[30] = {'\0'};
-    sprintf(char_AskPrice1,"%f",pDepthMarketData->AskPrice);
+    sprintf(char_AskPrice1,"%f",askPrice);
     marketdata.append(char_AskPrice1);
     marketdata.append(sep);
     ///申卖量一
@@ -615,7 +616,7 @@ void OnRtnSHFEMarketDataTwo(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
     ///最新价
     marketdata.append("LastPrice=");
     char char_LastPrice[30] = {'\0'};
-    sprintf(char_LastPrice,"%f",pDepthMarketData->LastPrice);
+    sprintf(char_LastPrice,"%f",lastPrice);
     marketdata.append(char_LastPrice);
     marketdata.append(sep);
     ///数量

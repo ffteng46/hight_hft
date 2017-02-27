@@ -126,9 +126,9 @@ int g_md_switch = 1;
 void *job_recv_market_data() {
     cerr << "--->>> " << "job_recv_market_data"  << endl;
     int handle = mduserapi->GetHandle();
-    CXeleShfeMarketDataUnion mdtick;
     ofstream log("RecvMarketDataTick.log");
     while (g_md_switch) {
+        CXeleShfeMarketDataUnion mdtick;
         if (RecvShfeMarketDataTick(handle, &mdtick)) {
             if (mdtick.md_type[0] == 'M') {
                 //printXeleShfeHighLevelOneMarketData(log, "ShfeHighLevelOneMarketData", &mdtick.type_high);
