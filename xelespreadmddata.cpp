@@ -1,4 +1,4 @@
-/**
+﻿/**
  *	@file reference.cpp
  *  @author shuaiw
  */
@@ -132,8 +132,8 @@ void *job_recv_market_data() {
         if (RecvShfeMarketDataTick(handle, &mdtick)) {
             if (mdtick.md_type[0] == 'M') {
                 //printXeleShfeHighLevelOneMarketData(log, "ShfeHighLevelOneMarketData", &mdtick.type_high);
-                //OnRtnSHFEMarketDataTwo(&mdtick.type_high);
-                OnRtnSHFEMarketData(&mdtick.type_high);
+                OnRtnSHFEMarketDataTwo(&mdtick.type_high);
+                //OnRtnSHFEMarketData(&mdtick.type_high);
             }
             else if (mdtick.md_type[0] == 'S') {
                 printXeleShfeLowLevelOneMarketData(log, "ShfeLowLevelOneMarketData", &mdtick.type_low);
