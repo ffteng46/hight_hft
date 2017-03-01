@@ -1652,35 +1652,66 @@ void CTraderSpi::tradeParaProcessTwo(){
             tmpmsg.append("空头持仓量=");
             tmpmsg.append(char_limit).append("大于shortpstlimit,short can not to open new position");
         }
-        cout<<tmpmsg<<endl;
-        LOG(INFO)<<tmpmsg;
+
+        string tmp1 ;
         //spread set
         int bidAkdSpread = abs(realShortPstLimit - realLongPstLimit);
         if(bidAkdSpread >= firstGap && bidAkdSpread < secondGap && realShortPstLimit  > realLongPstLimit){
             bidCulTimes += 2;
+            tmp1 = "bidAkdSpread=" + boost::lexical_cast<string>(bidAkdSpread)+" >= " + boost::lexical_cast<string>(firstGap) +
+                    " < "+boost::lexical_cast<string>(secondGap)+",and realShortPstLimit=" + boost::lexical_cast<string>(realShortPstLimit) +
+                    " > realLongPstLimit=" + boost::lexical_cast<string>(realLongPstLimit) + ",bidCulTimes set to " +
+                    boost::lexical_cast<string>(bidCulTimes);
             if(down_culculate >= bidCulTimes){
                 down_culculate = (4*down_culculate)/5;
+                tmp1 += ";down_culculate >= bidCulTimes" + boost::lexical_cast<string>(bidCulTimes) +
+                        ",change to " + boost::lexical_cast<string>(down_culculate);
             }
+            tmpmsg.append(tmp1);
         }else if(bidAkdSpread >= secondGap && realShortPstLimit > realLongPstLimit){
             bidCulTimes += 4;
+            tmp1 = "bidAkdSpread=" + boost::lexical_cast<string>(bidAkdSpread)+" >= " + boost::lexical_cast<string>(secondGap)+",and realShortPstLimit=" + boost::lexical_cast<string>(realShortPstLimit) +
+                    " > realLongPstLimit=" + boost::lexical_cast<string>(realLongPstLimit) + ",bidCulTimes set to " +
+                    boost::lexical_cast<string>(bidCulTimes);
             if(down_culculate >= bidCulTimes){
                 down_culculate = (4*down_culculate)/5;
+                tmp1 += ";down_culculate >= bidCulTimes" + boost::lexical_cast<string>(bidCulTimes) +
+                        ",change to " + boost::lexical_cast<string>(down_culculate);
             }
+            tmpmsg.append(tmp1);
         }else if(bidAkdSpread >= firstGap && bidAkdSpread < secondGap && realShortPstLimit < realLongPstLimit){
             askCulTimes += 2;
+            tmp1 = "bidAkdSpread=" + boost::lexical_cast<string>(bidAkdSpread)+" >= " + boost::lexical_cast<string>(firstGap) +
+                    " < "+boost::lexical_cast<string>(secondGap)+",and realShortPstLimit=" + boost::lexical_cast<string>(realShortPstLimit) +
+                    " < realLongPstLimit=" + boost::lexical_cast<string>(realLongPstLimit) + ",askCulTimes set to " +
+                    boost::lexical_cast<string>(askCulTimes);
             if(up_culculate >= askCulTimes){
                 up_culculate = (4*up_culculate)/5;
+                tmp1 += ";up_culculate >= askCulTimes" + boost::lexical_cast<string>(askCulTimes) +
+                        ",change to " + boost::lexical_cast<string>(up_culculate);
             }
+            tmpmsg.append(tmp1);
         }else if(bidAkdSpread >= secondGap && realShortPstLimit < realLongPstLimit){
             askCulTimes += 4;
+            tmp1 = "bidAkdSpread=" + boost::lexical_cast<string>(bidAkdSpread)+" >= " + boost::lexical_cast<string>(secondGap)+",and realShortPstLimit=" + boost::lexical_cast<string>(realShortPstLimit) +
+                    " < realLongPstLimit=" + boost::lexical_cast<string>(realLongPstLimit) + ",askCulTimes set to " +
+                    boost::lexical_cast<string>(askCulTimes);
             if(up_culculate >= askCulTimes){
                 up_culculate = (4*up_culculate)/5;
+                tmp1 += ";up_culculate >= askCulTimes" + boost::lexical_cast<string>(askCulTimes) +
+                        ",change to " + boost::lexical_cast<string>(up_culculate);
             }
+            tmpmsg.append(tmp1);
         }else{
+            tmp1 = "bidAkdSpread=" + boost::lexical_cast<string>(bidAkdSpread)+" < " + boost::lexical_cast<string>(firstGap) +
+                    ",askCulTimes bidCulTimes all set to " + boost::lexical_cast<string>(cul_times);
             bidCulTimes = cul_times;
             askCulTimes = cul_times;
         }
         lastABSSpread = bidAkdSpread;
+        tmpmsg.append(tmp1);
+        cout<<tmpmsg<<endl;
+        LOG(INFO)<<tmpmsg;
     }
 }
 //将投资者持仓信息写入文件保存
