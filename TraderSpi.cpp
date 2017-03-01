@@ -1667,7 +1667,7 @@ void CTraderSpi::tradeParaProcessTwo(){
                 tmp1 += ";down_culculate >= bidCulTimes" + boost::lexical_cast<string>(bidCulTimes) +
                         ",change to " + boost::lexical_cast<string>(down_culculate);
             }
-            tmpmsg.append(tmp1);
+            //tmpmsg.append(tmp1);
         }else if(bidAkdSpread >= secondGap && realShortPstLimit > realLongPstLimit){
             bidCulTimes += 4;
             tmp1 = "bidAkdSpread=" + boost::lexical_cast<string>(bidAkdSpread)+" >= " + boost::lexical_cast<string>(secondGap)+",and realShortPstLimit=" + boost::lexical_cast<string>(realShortPstLimit) +
@@ -1678,7 +1678,7 @@ void CTraderSpi::tradeParaProcessTwo(){
                 tmp1 += ";down_culculate >= bidCulTimes" + boost::lexical_cast<string>(bidCulTimes) +
                         ",change to " + boost::lexical_cast<string>(down_culculate);
             }
-            tmpmsg.append(tmp1);
+            //tmpmsg.append(tmp1);
         }else if(bidAkdSpread >= firstGap && bidAkdSpread < secondGap && realShortPstLimit < realLongPstLimit){
             askCulTimes += 2;
             tmp1 = "bidAkdSpread=" + boost::lexical_cast<string>(bidAkdSpread)+" >= " + boost::lexical_cast<string>(firstGap) +
@@ -1690,7 +1690,7 @@ void CTraderSpi::tradeParaProcessTwo(){
                 tmp1 += ";up_culculate >= askCulTimes" + boost::lexical_cast<string>(askCulTimes) +
                         ",change to " + boost::lexical_cast<string>(up_culculate);
             }
-            tmpmsg.append(tmp1);
+            //tmpmsg.append(tmp1);
         }else if(bidAkdSpread >= secondGap && realShortPstLimit < realLongPstLimit){
             askCulTimes += 4;
             tmp1 = "bidAkdSpread=" + boost::lexical_cast<string>(bidAkdSpread)+" >= " + boost::lexical_cast<string>(secondGap)+",and realShortPstLimit=" + boost::lexical_cast<string>(realShortPstLimit) +
@@ -1701,7 +1701,7 @@ void CTraderSpi::tradeParaProcessTwo(){
                 tmp1 += ";up_culculate >= askCulTimes" + boost::lexical_cast<string>(askCulTimes) +
                         ",change to " + boost::lexical_cast<string>(up_culculate);
             }
-            tmpmsg.append(tmp1);
+            //tmpmsg.append(tmp1);
         }else{
             tmp1 = "bidAkdSpread=" + boost::lexical_cast<string>(bidAkdSpread)+" < " + boost::lexical_cast<string>(firstGap) +
                     ",askCulTimes bidCulTimes all set to " + boost::lexical_cast<string>(cul_times);
