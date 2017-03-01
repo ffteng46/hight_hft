@@ -1,4 +1,4 @@
-﻿// testTraderApi.cpp : 定义控制台应用程序的入口点。
+// testTraderApi.cpp : 定义控制台应用程序的入口点。
 //
 #include "PublicFuncs.h"
 #include "TraderSpi.h"
@@ -13,6 +13,7 @@
 #include "Trade.h"
 #include "globalutil.h"
 #include <cstdio>
+
 using namespace std;
 unordered_map<string,unordered_map<string,int>> positionmap;
 // UserApi对象
@@ -110,6 +111,8 @@ void TradeProcess::startTrade()
     cout<<"持仓预警值="<<pstalarm<<endl;
     cout<<"默认下单量="<<default_volume<<endl;
     cout<<"单一合约="<<singleInstrument<<endl;
+    //string systime = getCurrentSystemTime();
+    //cout<<systime<<endl;
     //cout<<"买卖价差比较值="<<bid_ask_spread<<endl;
 //    cout<<"合约为："<<singleInstrument<<endl;
 //    for(int i = 0;i < quoteList.size();i++){
@@ -121,6 +124,11 @@ void TradeProcess::startTrade()
 //        //cout<<logmsg.getMsg()<<endl;
 //    }
 //    getchar();
+//    boost::posix_time::ptime pt = boost::posix_time::microsec_clock::local_time();
+
+//    cout<<boost::posix_time::to_iso_extended_string(pt)<<endl;
+//    cout<<boost::posix_time::to_iso_string(pt)<<endl;
+    //cout<<boost::posix_time::to_simple_string(pt)<<endl;
     cout<<"=========================================="<<endl;
     cout<<"是否继续?0 否，1是"<<endl;
     int isok;

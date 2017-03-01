@@ -451,13 +451,14 @@ void CTraderSpi::OnRspOrderInsert(CUstpFtdcInputOrderField *pInputOrder, CUstpFt
 
 void CTraderSpi::OnRtnTrade(CUstpFtdcTradeField *pTrade)
 {
+     string systime = getCurrentSystemTime();
     ret ++;
     //cerr << "--->>> " << "OnRtnTrade"  << endl;
     //处理持仓
-    int64_t start = GetSysTimeMicros();
+    //int64_t start = GetSysTimeMicros();
     //auto start = boost::chrono::high_resolution_clock::now();
-    char* ordersysid = pTrade->OrderSysID;
-    string str_ordersysid = boost::trim_copy(string(ordersysid));
+    //char* ordersysid = pTrade->OrderSysID;
+    //string str_ordersysid = boost::trim_copy(string(ordersysid));
 //    if(seq_map_ordersysid.find(str_ordersysid) != seq_map_ordersysid.end()){
 //        string tmpstr = "error:查询不到ordersysid="+str_ordersysid+" 的报单信息";
 //         LOG(INFO)<<tmpstr;
@@ -485,11 +486,11 @@ void CTraderSpi::OnRtnTrade(CUstpFtdcTradeField *pTrade)
 //		}
 //    }
     processtrade(pTrade);
-    int64_t end1 = GetSysTimeMicros();
-    string tradeInfo = "OnRtnTrade:";
+    //int64_t end1 = GetSysTimeMicros();
+    string tradeInfo = "OnRtnTrade:" + systime + ";";
     tradeInfo += storeInvestorTrade(pTrade);
     LOG(INFO)<<tradeInfo;
-    int64_t end2 = GetSysTimeMicros();
+   // int64_t end2 = GetSysTimeMicros();
  //   string msg = "处理成交花费:" + string(GetDiffTime(end1,start));
  //   LOG(INFO)<<msg;
     //recordRunningMsg(msg);
@@ -585,7 +586,8 @@ void CTraderSpi::Show(CUstpFtdcOrderField *pOrder)
 
 void CTraderSpi::OnRtnOrder(CUstpFtdcOrderField *pOrder)
 {
-    string msg = "OnRtnOrder:";
+    string systime = getCurrentSystemTime();
+    string msg = "OnRtnOrder:" + systime + ";";
     msg.append(getRtnOrder(pOrder));
     LOG(INFO)<<msg;
 //	printf("-----------------------------\n");
@@ -1656,6 +1658,15 @@ void CTraderSpi::tradeParaProcessTwo(){
         string tmp1 ;
         //spread set
         int bidAkdSpread = abs(realShortPstLimit - realLongPstLimit);
+        if(bidAkdSpread >= firstGap && bidAkdSpread < lastABSSpread){
+            tmp1 = "last cut_time setting is valid,need not to adjust agin.Watch.bidAkdSpread=" + boost::lexical_cast<string>(bidAkdSpread) +
+                    ",lastSpread=" + boost::lexical_cast<string>(lastABSSpread);
+            lastABSSpread = bidAkdSpread;
+            tmpmsg.append(tmp1);
+            cout<<tmpmsg<<endl;
+            LOG(INFO)<<tmpmsg;
+            return;
+        }
         if(bidAkdSpread >= firstGap && bidAkdSpread < secondGap && realShortPstLimit  > realLongPstLimit){
             bidCulTimes += 2;
             tmp1 = "bidAkdSpread=" + boost::lexical_cast<string>(bidAkdSpread)+" >= " + boost::lexical_cast<string>(firstGap) +

@@ -186,12 +186,13 @@ void recordRunningMsg(string msg){
 }
 ////获取当前系统时间
 string getCurrentSystemTime(){
-    time_t tmp_time = chrono::system_clock::to_time_t(chrono::system_clock::now());
-    tm* tm_time = localtime(&tmp_time);
-    auto auto_time = put_time(tm_time,"%F %H:%M:%S");
-    stringstream ss;
-    ss<<auto_time;
-    return ss.str();
+//    time_t tmp_time = chrono::system_clock::to_time_t(chrono::system_clock::now());
+//    tm* tm_time = localtime(&tmp_time);
+//    auto auto_time = put_time(tm_time,"%F %H:%M:%S");
+//    stringstream ss;
+//    ss<<auto_time;
+    boost::posix_time::ptime pt = boost::posix_time::microsec_clock::local_time();
+    return boost::posix_time::to_iso_extended_string(pt);
 }
 void test(){
     int g;
@@ -545,9 +546,10 @@ void OnRtnSHFEMarketData(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
 void OnRtnSHFEMarketDataTwo(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
 {
     //处理行情
-    int64_t start_time = GetSysTimeMicros();
+    string systime = getCurrentSystemTime();
     auto chro_start_time = boost::chrono::high_resolution_clock::now();
     string marketdata;
+    marketdata.append(systime+";");
     stringstream ss;
     char instrumentID[17] = {'\0'};
     strcpy(instrumentID,pDepthMarketData->Instrument);
@@ -756,8 +758,8 @@ void OnRtnSHFEMarketDataTwo(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
         char c_msg[300];
         sprintf(c_upcul,"%d",up_culculate);
         sprintf(c_downcul,"%d",down_culculate);
-        sprintf(c_msg,"order: instrumentid=%s,direction=%s,offsetflag=%s,price=%s,askCulTimes=%d,up_culculate=%s,down_culculate=%s",
-                singleInstrument,char_orderdir,char_orderoffset,c_price,askCulTimes,c_upcul,c_downcul);
+        sprintf(c_msg,"order: instrumentid=%s,direction=%s,offsetflag=%s,price=%s,askCulTimes=%d,up_culculate=%s,down_culculate=%s,bidCulTimes=%s",
+                singleInstrument,char_orderdir,char_orderoffset,c_price,askCulTimes,c_upcul,c_downcul,boost::lexical_cast<string>(bidCulTimes));
         string com_str = string(c_msg) + ";" + marketdata;
         //cout<<com_str<<endl;
         LOG(INFO)<<com_str;
