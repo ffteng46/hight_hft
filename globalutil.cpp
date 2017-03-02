@@ -123,7 +123,7 @@ void marketdataEngine(){
             if(info.size() == 0){
                 continue;
             }
-            info = getCurrentSystemTime()+" "+info;
+            //info = getCurrentSystemTime()+" "+info;
             //cout<<"行情日志："<<info<<";size="<<info.size()<<endl;
             info.copy(cw,info.size(),0);
             //cout<<"日志："<<cw<<";size="<<strlen(cw)<<endl;
@@ -246,10 +246,10 @@ void initPriceGap(){
 //            gap_list[0] = down_gap;
 //            gap_list[1] = up_gap;
             map_price_gap[tmp_price] = gap_list;
-            //char c_tmp[100];
-            //sprintf(c_tmp,"price=%f down=%f up=%f",tmp_price,gap_list[0],gap_list[1]);
+            char c_tmp[100];
+            sprintf(c_tmp,"price=%f down=%f up=%f",tmp_price,gap_list[0],gap_list[1]);
             //cout<<c_tmp<<endl;
-            //LOG(INFO) << c_tmp;
+            LOG(INFO) << c_tmp;
         }else{
             break;
         }
