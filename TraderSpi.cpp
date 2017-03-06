@@ -1,4 +1,4 @@
-// TraderSpi.cpp: implementation of the CTraderSpi class.
+﻿// TraderSpi.cpp: implementation of the CTraderSpi class.
 //
 //////////////////////////////////////////////////////////////////////
 
@@ -1631,30 +1631,32 @@ void CTraderSpi::tradeParaProcessTwo(){
         realLongPstLimit = map_iterator->second["longTotalPosition"];
         int shortYdPst = map_iterator->second["shortYdPosition"];
         int longYdPst = map_iterator->second["longYdPosition"];
-        if(longYdPst > 0){
-            shortPstIsClose = 2;
-            short_offset_flag = 4;
-        }
-        if(shortYdPst > 0){
-            longPstIsClose = 2;
-            long_offset_flag = 4;
-        }
+
         // buy or open judge
         if(realLongPstLimit > longpstlimit){ //多头超过持仓限额
             char char_limit[10] = {'\0'};
             sprintf(char_limit,"%d",realLongPstLimit);
             longPstIsClose = 11;//long can not to open new position
             tmpmsg.append("多头持仓量=");
-            tmpmsg.append(char_limit).append("大于longpstlimit,long can not to open new position");
+            tmpmsg.append(char_limit).append("大于longpstlimit,long can not to open new position.");
         }
         if(realShortPstLimit > shortpstlimit){//空头开平仓判断
             char char_limit[10] = {'\0'};
             sprintf(char_limit,"%d",realShortPstLimit);
             shortPstIsClose = 11;
             tmpmsg.append("空头持仓量=");
-            tmpmsg.append(char_limit).append("大于shortpstlimit,short can not to open new position");
+            tmpmsg.append(char_limit).append("大于shortpstlimit,short can not to open new position.");
         }
-
+        if(longYdPst > 0){
+            shortPstIsClose = 2;
+            short_offset_flag = 4;
+            tmpmsg.append("long has yestoday position,can be set to close yestoday position.");
+        }
+        if(shortYdPst > 0){
+            longPstIsClose = 2;
+            long_offset_flag = 4;
+            tmpmsg.append("short has yestoday position,can be set to close yestoday position.");
+        }
         string tmp1 ;
         //spread set
         int bidAkdSpread = abs(realShortPstLimit - realLongPstLimit);
