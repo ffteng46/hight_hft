@@ -27,16 +27,16 @@ extern int iRequestID;
 extern int g_nOrdLocalID;
 extern double tick;
 extern int isclose;
-extern int long_offset_flag;
-extern int short_offset_flag;
+extern boost::atomic_int long_offset_flag;
+extern boost::atomic_int short_offset_flag;
 //卖出报单触发信号
-extern int askCulTimes;
+extern boost::atomic_int askCulTimes;
 //买入报单触发信号
-extern int bidCulTimes;
+extern boost::atomic_int bidCulTimes;
 //上涨
-extern int up_culculate;
+extern boost::atomic_int up_culculate;
 //下跌
-extern int down_culculate;
+extern boost::atomic_int down_culculate;
 //报单触发信号
 extern int cul_times;
 extern int limit_volume;
@@ -51,8 +51,8 @@ extern boost::lockfree::queue<LogMsg*> logqueue;
 extern unordered_map<string,unordered_map<string,int64_t>> seq_map_orderref;
 extern unordered_map<string,string> seq_map_ordersysid;
 //买平标志,1开仓；2平仓
-extern int longPstIsClose;
-extern int shortPstIsClose;
+extern boost::atomic_int longPstIsClose;
+extern boost::atomic_int shortPstIsClose;
 //positionmap可重入锁
 boost::recursive_mutex pst_mtx;
 //orderinsertkey与ordersysid对应关系锁
@@ -64,8 +64,9 @@ extern int shortpstlimit;
 //记录时间
 int ret = 0;
 int start_process = 0;
-int realLongPstLimit = 0;
-int realShortPstLimit = 0;
+boost::atomic_int realLongPstLimit(0);
+boost::atomic_int realShortPstLimit(0);
+boost::atomic_int fastCloseRisk(2);//1,open fast;2,close fast
 int lastABSSpread = 0;
 int firstGap = 2;
 int secondGap = 5;
@@ -451,58 +452,13 @@ void CTraderSpi::OnRspOrderInsert(CUstpFtdcInputOrderField *pInputOrder, CUstpFt
 
 void CTraderSpi::OnRtnTrade(CUstpFtdcTradeField *pTrade)
 {
-     string systime = getCurrentSystemTime();
+    string systime = getCurrentSystemTime();
     ret ++;
-    //cerr << "--->>> " << "OnRtnTrade"  << endl;
-    //处理持仓
-    //int64_t start = GetSysTimeMicros();
-    //auto start = boost::chrono::high_resolution_clock::now();
-    //char* ordersysid = pTrade->OrderSysID;
-    //string str_ordersysid = boost::trim_copy(string(ordersysid));
-//    if(seq_map_ordersysid.find(str_ordersysid) != seq_map_ordersysid.end()){
-//        string tmpstr = "error:查询不到ordersysid="+str_ordersysid+" 的报单信息";
-//         LOG(INFO)<<tmpstr;
-//    }else if(isrtntradeprocess){
-        //根据ordersysid查询orderinsertkey
-//        unordered_map<string,string>::iterator tmpit = seq_map_ordersysid.find(str_ordersysid);
-//		string orderinsertkey = tmpit->second;
-//		if(orderinsertkey.size() != 0){
-//            unordered_map<string,unordered_map<string,int64_t>>::iterator tmptrade = seq_map_orderref.find(tmpit->second);
-//            unordered_map<string,int64_t> timemap = tmptrade->second;//遍历报单的相关时间差
-//            timemap["exchange_rtntrade"] = start;
-//            unordered_map<string,int64_t>::iterator mapit = timemap.begin();
-//			string str_time_msg;
-//			while(mapit!=timemap.end()){
-//				string key = mapit->first;
-////                stringstream ss;
-////                ss<<boost::chrono::duration<double>(start -mapit->second).count();
-//                char char_time[21] = {'\0'};
-//                sprintf(char_time,"%d",mapit->second);
-//                string str_time = ss.str();
-//				str_time_msg.append(key + "=" +str_time +";" );
-//				mapit ++ ;
-//			}
-//             LOG(INFO)<<str_time_msg;
-//		}
-//    }
     processtrade(pTrade);
     //int64_t end1 = GetSysTimeMicros();
     string tradeInfo = "OnRtnTrade:" + systime + ";";
     tradeInfo += storeInvestorTrade(pTrade);
     LOG(INFO)<<tradeInfo;
-   // int64_t end2 = GetSysTimeMicros();
- //   string msg = "处理成交花费:" + string(GetDiffTime(end1,start));
- //   LOG(INFO)<<msg;
-    //recordRunningMsg(msg);
-//    recordRunningMsg(tradeInfo);
-    //msg = "记录成交花费:" + string(GetDiffTime(end2,end1));
-    //recordRunningMsg(msg);
-//    logqueue.push(&logmsg);
-//	printf("-----------------------------\n");
-//    printf("received rtn trade\n");
-//	Show(pTrade);
-//	printf("-----------------------------\n");
-//	return;
 }
 void CTraderSpi::OnHeartBeatWarning(int nTimeLapse)
 {
@@ -1159,12 +1115,12 @@ bool CTraderSpi::IsErrorRspInfo(CUstpFtdcRspInfoField *pRspInfo)
             longPstIsClose = 2;
             shortPstIsClose = 2;
             cerr << "--->>> ErrorID=" << pRspInfo->ErrorID << ", ErrorMsg=" << errmsg <<",isclose平仓开仓方式修改为:"<<longPstIsClose<<endl;
-            sprintf(char_msg, "--->>> ErrorID=%d,ErrorMsg=%s,isclose平仓开仓方式修改为:%d",pRspInfo->ErrorID,  boosttoolsnamespace::CBoostTools::gbktoutf8(pRspInfo->ErrorMsg),longPstIsClose);
+            sprintf(char_msg, "--->>> ErrorID=%d,ErrorMsg=%s,isclose平仓开仓方式修改为:%s",pRspInfo->ErrorID,  boosttoolsnamespace::CBoostTools::gbktoutf8(pRspInfo->ErrorMsg),boost::lexical_cast<string>(longPstIsClose));
         }else if(pRspInfo->ErrorID == 31){//平仓量超过持仓量
             longPstIsClose = 1;
             shortPstIsClose = 1;
             cerr << "--->>> ErrorID=" << pRspInfo->ErrorID << ", ErrorMsg=" << errmsg <<",isclose平仓开仓方式修改为:"<<longPstIsClose<<endl;
-            sprintf(char_msg, "--->>> ErrorID=%d,ErrorMsg=%s,isclose平仓开仓方式修改为:%d",pRspInfo->ErrorID,  boosttoolsnamespace::CBoostTools::gbktoutf8(pRspInfo->ErrorMsg),longPstIsClose);
+            sprintf(char_msg, "--->>> ErrorID=%d,ErrorMsg=%s,isclose平仓开仓方式修改为:%s",pRspInfo->ErrorID,  boosttoolsnamespace::CBoostTools::gbktoutf8(pRspInfo->ErrorMsg),boost::lexical_cast<string>(longPstIsClose));
         }/*else if(pRspInfo->ErrorID == 51){//平昨仓位不足
             offset_flag = 3;
             cerr << "--->>> ErrorID=" << pRspInfo->ErrorID << ", ErrorMsg=" << errmsg <<",平仓方式修改为平今:"<<offset_flag<<endl;
@@ -1464,166 +1420,7 @@ int CTraderSpi::processtrade(CUstpFtdcTradeField *pTrade)
 //    logqueue.push(logmsg);
     return 0;
 }
-void CTraderSpi::tradeParaProcess(){
-    for(unordered_map<string,unordered_map<string,int>>::iterator map_iterator=positionmap.begin();map_iterator != positionmap.end();map_iterator ++){
-        string tmpmsg;
-        realShortPstLimit = map_iterator->second["shortTotalPosition"];
-        realLongPstLimit = map_iterator->second["longTotalPosition"];
-        int shortYdPst = map_iterator->second["shortYdPosition"];
-        int longYdPst = map_iterator->second["longYdPosition"];
-        // buy or open judge
-        if(realLongPstLimit > longpstlimit){ //多头超过持仓限额，且必须空头有持仓才能多头平仓
-            char char_limit[10] = {'\0'};
-            sprintf(char_limit,"%d",realLongPstLimit);
-            if(realShortPstLimit == 0){
-                longPstIsClose = 1;
-                tmpmsg.append("多头持仓量=");
-                tmpmsg.append(char_limit).append("大于longpstlimit,but realShortPstLimit is zero,仍然为多头开仓");
-                //LOG(INFO)<<tmpmsg;
-            }else{
-                longPstIsClose = 2;
-                if(shortYdPst > 0){//privious to close yesterday position
-                    long_offset_flag = 4;
-                }else{
-                    long_offset_flag = 3;
-                }
-                tmpmsg.append("多头持仓量=");
-                tmpmsg.append(char_limit).append("大于longpstlimit,and realShortPstLimit is not zero,修改为多头平仓");
-                //LOG(INFO)<<tmpmsg;
-            }
-        }else if(realShortPstLimit > shortpstlimit){//空头开平仓判断
-            char char_limit[10] = {'\0'};
-            sprintf(char_limit,"%d",realShortPstLimit);
-            if(realLongPstLimit == 0){
-                shortPstIsClose = 1;
-                tmpmsg.append("空头持仓量=");
-                tmpmsg.append(char_limit).append("大于shortpstlimit,but realLongPstLimit is zero,仍然为空头开仓");
-                //LOG(INFO)<<tmpmsg;
-            }else{
-                shortPstIsClose = 2;
-                if(longYdPst > 0){//privious to close yesterday position
-                    short_offset_flag = 4;
-                }else{
-                    short_offset_flag = 3;
-                }
-                tmpmsg.append("空头持仓量=");
-                tmpmsg.append(char_limit).append("大于shortpstlimit,and realLongPstLimit is not zero,修改为空头平仓");
-                //LOG(INFO)<<tmpmsg;
-            }
-        }
-//        LogMsg *logmsg = new LogMsg();
-//        logmsg->setMsg(tmpmsg);
-//        logqueue.push(logmsg);
-        cout<<tmpmsg<<endl;
-        LOG(INFO)<<tmpmsg;
 
-        //spread set
-        int bidAkdSpread = abs(realShortPstLimit - realLongPstLimit);
-        if(bidAkdSpread < lastABSSpread && bidAkdSpread >= 5){
-
-            char c_bas[10];
-            sprintf(c_bas,"%d",bidAkdSpread);
-            char c_lasts[10];
-            sprintf(c_lasts,"%d",lastABSSpread);
-            lastABSSpread = bidAkdSpread;
-            string tmpmsg1 = "current bidAkdSpread=" + string(c_bas) + ",lastABSSpread=" + string(c_lasts) +
-                    ",cul_times seting is available!!";
-//            LogMsg *logmsg1 = new LogMsg();
-//            logmsg1->setMsg(tmpmsg1);
-//            logqueue.push(logmsg1);
-            cout<<tmpmsg1<<endl;
-            LOG(INFO)<<tmpmsg1;
-            return;//avaialable
-        }
-        string s_msg;
-        char c_bss[10];
-        char c_realShortPstLimit[10];
-        char c_realLongPstLimit[10];
-        sprintf(c_bss,"%d",bidAkdSpread);
-        sprintf(c_realShortPstLimit,"%d",realShortPstLimit);
-        sprintf(c_realLongPstLimit,"%d",realLongPstLimit);
-        if(bidAkdSpread >= 3 && bidAkdSpread <10){
-            lastABSSpread = bidAkdSpread;
-            if(realShortPstLimit > realLongPstLimit){//increase ask(sell) spread
-                char c_pre_askCulTimes[10];
-                sprintf(c_pre_askCulTimes,"%d",askCulTimes);
-                askCulTimes += 1;
-                char c_asktimes[100];
-                if(up_culculate >= askCulTimes){
-                    int tmp_cul = ((4*askCulTimes)/5);
-                    sprintf(c_asktimes ,"up_culculate set from %d to %d;",up_culculate,tmp_cul);
-                    up_culculate = tmp_cul;
-                }
-                char c_after_askCulTimes[10];
-                sprintf(c_after_askCulTimes,"%d",askCulTimes);
-                s_msg = string(c_asktimes) + "bidpst=" + string(c_realLongPstLimit) + ",askpst=" + string(c_realShortPstLimit) + ",spread=" + string(c_bss) +",>=5 and <10,askCulTimes is set from " +
-                        string(c_pre_askCulTimes) + "to " + string(c_after_askCulTimes);
-            }else{
-                char c_pre_bidCulTimes[10];
-                sprintf(c_pre_bidCulTimes,"%d",bidCulTimes);
-                bidCulTimes += 1;
-                char c_times[100];
-                if(down_culculate >= bidCulTimes){
-                    int tmp_cul = ((4*bidCulTimes)/5);
-                    sprintf(c_times,"down_culculate set from %d to %d;",down_culculate,tmp_cul);
-                    down_culculate = tmp_cul;
-                }
-                char c_after_bidCulTimes[10];
-                sprintf(c_after_bidCulTimes,"%d",bidCulTimes);
-                s_msg = string(c_times) +  "bidpst=" + string(c_realLongPstLimit) + ",askpst=" + string(c_realShortPstLimit) + ",spread=" + string(c_bss) +",>=5 and <10,bidCulTimes is set from " +
-                        string(c_pre_bidCulTimes) + "to " + string(c_after_bidCulTimes);
-
-            }
-        }else if(bidAkdSpread >= 10){
-            lastABSSpread = bidAkdSpread;
-            if(realShortPstLimit > realLongPstLimit){//increase ask(sell) spread
-                char c_pre_askCulTimes[10];
-                sprintf(c_pre_askCulTimes,"%d",askCulTimes);
-                askCulTimes += 2;
-                char c_asktimes[100];
-                if(up_culculate >= askCulTimes){
-                    int tmp_cul = ((4*askCulTimes)/5);
-                    sprintf(c_asktimes ,"up_culculate set from %d to %d;",up_culculate,tmp_cul);
-                    up_culculate = tmp_cul;
-                }
-                char c_after_askCulTimes[10];
-                sprintf(c_after_askCulTimes,"%d",askCulTimes);
-                s_msg = string(c_asktimes) +  "bidpst=" + string(c_realLongPstLimit) + ",askpst=" + string(c_realShortPstLimit) + ",spread=" + string(c_bss) +",>=10,askCulTimes is set from " +
-                        string(c_pre_askCulTimes) + "to " + string(c_after_askCulTimes);
-            }else{
-                char c_pre_bidCulTimes[10];
-                sprintf(c_pre_bidCulTimes,"%d",bidCulTimes);
-                bidCulTimes += 2;
-                char c_times[100];
-                if(down_culculate >= bidCulTimes){
-                    int tmp_cul = ((4*bidCulTimes)/5);
-                    sprintf(c_times,"down_culculate set from %d to %d;",down_culculate,tmp_cul);
-                    down_culculate = tmp_cul;
-                }
-                char c_after_bidCulTimes[10];
-                sprintf(c_after_bidCulTimes,"%d",bidCulTimes);
-                s_msg = string(c_times) +  "bidpst=" + string(c_realLongPstLimit) + ",askpst=" + string(c_realShortPstLimit) + ",spread=" + string(c_bss) +",>=10,bidCulTimes is set from " +
-                        string(c_pre_bidCulTimes) + "to " + string(c_after_bidCulTimes);
-            }
-        }else{
-            char c_askCulTimes[10];
-            sprintf(c_askCulTimes,"%d",askCulTimes);
-            char c_bidCulTimes[10];
-            sprintf(c_bidCulTimes,"%d",bidCulTimes);
-            askCulTimes = cul_times;
-            bidCulTimes = cul_times;
-            char c_culTime[10];
-            sprintf(c_culTime,"%d",cul_times);
-            s_msg = "bidpst=" + string(c_realLongPstLimit) + ",askpst=" + string(c_realShortPstLimit) + ",spread=" + string(c_bss) +",<5,bidCulTimes is set from " +
-                    string(c_bidCulTimes) + "to " + string(c_culTime) + ";askCulTimes is set from " + string(c_askCulTimes) + "to " + string(c_culTime);
-        }
-//        logmsg = new LogMsg();
-//        logmsg->setMsg(s_msg);
-//        logqueue.push(logmsg);
-        cout<<s_msg<<endl;
-        LOG(INFO)<<s_msg;
-    }
-}
 void CTraderSpi::tradeParaProcessTwo(){
     for(unordered_map<string,unordered_map<string,int>>::iterator map_iterator=positionmap.begin();map_iterator != positionmap.end();map_iterator ++){
         string tmpmsg="TradeParaProcess:";
@@ -1631,6 +1428,22 @@ void CTraderSpi::tradeParaProcessTwo(){
         realLongPstLimit = map_iterator->second["longTotalPosition"];
         int shortYdPst = map_iterator->second["shortYdPosition"];
         int longYdPst = map_iterator->second["longYdPosition"];
+
+        // buy or open judge
+        if(realLongPstLimit > longpstlimit){ //多头超过持仓限额
+            string char_limit = boost::lexical_cast<string>(realLongPstLimit);
+//            sprintf(char_limit,"%d",realLongPstLimit);
+            longPstIsClose = 11;//long can not to open new position
+            tmpmsg.append("多头持仓量=");
+            tmpmsg.append(char_limit).append(",大于longpstlimit,long can not to open new position");
+        }
+        if(realShortPstLimit > shortpstlimit){//空头开平仓判断
+            string char_limit =boost::lexical_cast<string>(realShortPstLimit);
+//            sprintf(char_limit,"%d",realShortPstLimit);
+            shortPstIsClose = 11;
+            tmpmsg.append("空头持仓量=");
+            tmpmsg.append(char_limit).append(",大于shortpstlimit,short can not to open new position");
+        }
         if(longYdPst > 0){
             shortPstIsClose = 2;
             short_offset_flag = 4;
@@ -1639,22 +1452,6 @@ void CTraderSpi::tradeParaProcessTwo(){
             longPstIsClose = 2;
             long_offset_flag = 4;
         }
-        // buy or open judge
-        if(realLongPstLimit > longpstlimit){ //多头超过持仓限额
-            char char_limit[10] = {'\0'};
-            sprintf(char_limit,"%d",realLongPstLimit);
-            longPstIsClose = 11;//long can not to open new position
-            tmpmsg.append("多头持仓量=");
-            tmpmsg.append(char_limit).append("大于longpstlimit,long can not to open new position");
-        }
-        if(realShortPstLimit > shortpstlimit){//空头开平仓判断
-            char char_limit[10] = {'\0'};
-            sprintf(char_limit,"%d",realShortPstLimit);
-            shortPstIsClose = 11;
-            tmpmsg.append("空头持仓量=");
-            tmpmsg.append(char_limit).append("大于shortpstlimit,short can not to open new position");
-        }
-
         string tmp1 ;
         //spread set
         int bidAkdSpread = abs(realShortPstLimit - realLongPstLimit);
@@ -1669,10 +1466,13 @@ void CTraderSpi::tradeParaProcessTwo(){
         }
         if(bidAkdSpread >= firstGap && bidAkdSpread < secondGap && realShortPstLimit  > realLongPstLimit){
             bidCulTimes += 2;
+            askCulTimes = 2;
+            fastCloseRisk = 1;//open fast close
             tmp1 = "bidAkdSpread=" + boost::lexical_cast<string>(bidAkdSpread)+" >= " + boost::lexical_cast<string>(firstGap) +
                     " < "+boost::lexical_cast<string>(secondGap)+",and realShortPstLimit=" + boost::lexical_cast<string>(realShortPstLimit) +
-                    " > realLongPstLimit=" + boost::lexical_cast<string>(realLongPstLimit) + ",bidCulTimes set to " +
-                    boost::lexical_cast<string>(bidCulTimes);
+                    " > realLongPstLimit=" + boost::lexical_cast<string>(realLongPstLimit) + ";bidCulTimes set to " +
+                    boost::lexical_cast<string>(bidCulTimes) + ",askCultimes set to " + boost::lexical_cast<string>(askCulTimes) +
+                    ",fastCloseRisk set to 1,open fast.";
             if(down_culculate >= bidCulTimes){
                 down_culculate = (4*down_culculate)/5;
                 tmp1 += ";down_culculate >= bidCulTimes" + boost::lexical_cast<string>(bidCulTimes) +
@@ -1681,9 +1481,12 @@ void CTraderSpi::tradeParaProcessTwo(){
             //tmpmsg.append(tmp1);
         }else if(bidAkdSpread >= secondGap && realShortPstLimit > realLongPstLimit){
             bidCulTimes += 4;
+            askCulTimes = 1;
+            fastCloseRisk = 1;//open fast close
             tmp1 = "bidAkdSpread=" + boost::lexical_cast<string>(bidAkdSpread)+" >= " + boost::lexical_cast<string>(secondGap)+",and realShortPstLimit=" + boost::lexical_cast<string>(realShortPstLimit) +
                     " > realLongPstLimit=" + boost::lexical_cast<string>(realLongPstLimit) + ",bidCulTimes set to " +
-                    boost::lexical_cast<string>(bidCulTimes);
+                    boost::lexical_cast<string>(bidCulTimes) + ",askCultimes set to " + boost::lexical_cast<string>(askCulTimes) +
+                    ",fastCloseRisk set to 1,open fast.";
             if(down_culculate >= bidCulTimes){
                 down_culculate = (4*down_culculate)/5;
                 tmp1 += ";down_culculate >= bidCulTimes" + boost::lexical_cast<string>(bidCulTimes) +
@@ -1692,10 +1495,13 @@ void CTraderSpi::tradeParaProcessTwo(){
             //tmpmsg.append(tmp1);
         }else if(bidAkdSpread >= firstGap && bidAkdSpread < secondGap && realShortPstLimit < realLongPstLimit){
             askCulTimes += 2;
+            bidCulTimes = 2;
+            fastCloseRisk = 1;//open fast close
             tmp1 = "bidAkdSpread=" + boost::lexical_cast<string>(bidAkdSpread)+" >= " + boost::lexical_cast<string>(firstGap) +
                     " < "+boost::lexical_cast<string>(secondGap)+",and realShortPstLimit=" + boost::lexical_cast<string>(realShortPstLimit) +
                     " < realLongPstLimit=" + boost::lexical_cast<string>(realLongPstLimit) + ",askCulTimes set to " +
-                    boost::lexical_cast<string>(askCulTimes);
+                    boost::lexical_cast<string>(askCulTimes)+ ",bidCultimes set to " + boost::lexical_cast<string>(bidCulTimes) +
+                    ",fastCloseRisk set to 1,open fast.";
             if(up_culculate >= askCulTimes){
                 up_culculate = (4*up_culculate)/5;
                 tmp1 += ";up_culculate >= askCulTimes" + boost::lexical_cast<string>(askCulTimes) +
@@ -1704,9 +1510,12 @@ void CTraderSpi::tradeParaProcessTwo(){
             //tmpmsg.append(tmp1);
         }else if(bidAkdSpread >= secondGap && realShortPstLimit < realLongPstLimit){
             askCulTimes += 4;
+            bidCulTimes = 1;
+            fastCloseRisk = 1;//open fast close
             tmp1 = "bidAkdSpread=" + boost::lexical_cast<string>(bidAkdSpread)+" >= " + boost::lexical_cast<string>(secondGap)+",and realShortPstLimit=" + boost::lexical_cast<string>(realShortPstLimit) +
                     " < realLongPstLimit=" + boost::lexical_cast<string>(realLongPstLimit) + ",askCulTimes set to " +
-                    boost::lexical_cast<string>(askCulTimes);
+                    boost::lexical_cast<string>(askCulTimes) + ",bidCultimes set to " + boost::lexical_cast<string>(bidCulTimes) +
+                    ",fastCloseRisk set to 1,open fast.";
             if(up_culculate >= askCulTimes){
                 up_culculate = (4*up_culculate)/5;
                 tmp1 += ";up_culculate >= askCulTimes" + boost::lexical_cast<string>(askCulTimes) +
@@ -1715,9 +1524,10 @@ void CTraderSpi::tradeParaProcessTwo(){
             //tmpmsg.append(tmp1);
         }else{
             tmp1 = "bidAkdSpread=" + boost::lexical_cast<string>(bidAkdSpread)+" < " + boost::lexical_cast<string>(firstGap) +
-                    ",askCulTimes bidCulTimes all set to " + boost::lexical_cast<string>(cul_times);
+                    ",askCulTimes bidCulTimes all set to " + boost::lexical_cast<string>(cul_times) + ",fastCloseRisk set to 2,close fast.";;
             bidCulTimes = cul_times;
             askCulTimes = cul_times;
+            fastCloseRisk = 2;//close fast close
         }
         lastABSSpread = bidAkdSpread;
         tmpmsg.append(tmp1);

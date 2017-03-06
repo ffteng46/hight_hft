@@ -49,12 +49,12 @@ double max_price = 0;
 //价格变动单位
 double tick = 0;
 //卖出报单触发信号
-int askCulTimes = 3;
+boost::atomic_int askCulTimes(3);
 //买入报单触发信号
-int bidCulTimes = 3;
+boost::atomic_int bidCulTimes(3);
 //买平标志,1开仓；2平仓
-int longPstIsClose = 1;
-int shortPstIsClose = 1;
+boost::atomic_int longPstIsClose(1);
+boost::atomic_int shortPstIsClose(1);
 //价格浮动倍数
 int bidmultipy = 1;
 //价格浮动倍数卖
@@ -74,8 +74,8 @@ boost::lockfree::queue<LogMsg*> logqueue(1000);
 //存放行情消息队列
 boost::lockfree::queue<LogMsg*> mkdataqueue(1000);
 ////组合开平标志: 开仓 '0';平仓 '1';平今 '3';平昨 '4';强平 '2'
-int long_offset_flag = 1;
-int short_offset_flag = 1;
+boost::atomic_int long_offset_flag(1);
+boost::atomic_int short_offset_flag(1);
 //前置id
 char char_front_id[12] = {'\0'};
 char char_session_id[20] = {'\0'};
