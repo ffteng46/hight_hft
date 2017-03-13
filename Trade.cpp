@@ -55,6 +55,10 @@ boost::atomic_int bidCulTimes(3);
 //买平标志,1开仓；2平仓
 boost::atomic_int longPstIsClose(1);
 boost::atomic_int shortPstIsClose(1);
+//price up to sell
+boost::atomic_int priceUpToSell(5);
+//price down to buy
+boost::atomic_int priceDownToBuy(-5);
 //价格浮动倍数
 int bidmultipy = 1;
 //价格浮动倍数卖
@@ -111,6 +115,8 @@ void TradeProcess::startTrade()
     cout<<"持仓预警值="<<pstalarm<<endl;
     cout<<"默认下单量="<<default_volume<<endl;
     cout<<"单一合约="<<singleInstrument<<endl;
+    cout<<"priceUpToSell="<<priceUpToSell<<endl;
+    cout<<"priceDownToBuy="<<priceDownToBuy<<endl;
     //string systime = getCurrentSystemTime();
     //cout<<systime<<endl;
     //cout<<"买卖价差比较值="<<bid_ask_spread<<endl;
@@ -188,6 +194,10 @@ void TradeProcess::datainit(){
                     max_price = boost::lexical_cast<double>(vec[1]);
                 }else if("pstalarm"==vec[0]){
                     pstalarm = boost::lexical_cast<int>(vec[1]);
+                }else if("priceUpToSell"==vec[0]){
+                    priceUpToSell = boost::lexical_cast<int>(vec[1]);
+                }else if("priceDownToBuy"==vec[0]){
+                    priceDownToBuy = boost::lexical_cast<int>(vec[1]);
                 }else if("longpstlimit"==vec[0]){
                     longpstlimit = boost::lexical_cast<int>(vec[1]);
                 }else if("shortpstlimit"==vec[0]){

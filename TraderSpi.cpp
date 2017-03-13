@@ -10,6 +10,7 @@
 #include <fstream>
 #include <unordered_map>
 #include <string.h>
+#include <vector>
 #include <boost/thread/recursive_mutex.hpp>
 #include <boost/algorithm/string.hpp>
 //////////////////////////////////////////////////////////////////////
@@ -67,6 +68,8 @@ int start_process = 0;
 boost::atomic_int realLongPstLimit(0);
 boost::atomic_int realShortPstLimit(0);
 boost::atomic_int fastCloseRisk(2);//1,open fast;2,close fast
+boost::atomic_int  mkPriceChangeCount(0);
+Vector<boost::atomic_int> mkPriceChangeVec;
 int lastABSSpread = 0;
 int firstGap = 2;
 int secondGap = 5;

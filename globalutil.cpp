@@ -45,6 +45,10 @@ double previous_price = 0;
 boost::atomic_int up_culculate(0);
 //下跌
 boost::atomic_int down_culculate(0);
+//price up to sell
+extern boost::atomic_int priceUpToSell;
+//price down to buy
+extern boost::atomic_int priceDownToBuy;
 //上一次价格所处的区间
 int last_gap = -1;
 //报单触发信号
@@ -67,6 +71,8 @@ int bi=30;
 extern  boost::atomic_int realLongPstLimit;
 extern  boost::atomic_int realShortPstLimit;
 extern  boost::atomic_int fastCloseRisk;//1,open fast;2,close fast
+extern boost::atomic_int  mkPriceChangeCount;
+extern Vector<boost::atomic_int> mkPriceChangeVec;
 //卖出报单触发信号
 extern  boost::atomic_int askCulTimes;
 //买入报单触发信号
@@ -427,13 +433,15 @@ void OnRtnSHFEMarketDataTwo(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
     }else if(last_gap < gap){
         down_culculate = 0;
         up_culculate += 1;
+        mkPriceChangeCount += 1;
     }else if(last_gap > gap){
         down_culculate += 1;
         up_culculate = 0;
+        mkPriceChangeCount -= 1;
     }
-    sprintf(tmp_msg,"currPrice=%s,prePrice=%s,bidprice=%f,askprice=%f,up_culculate=%s,askCulTimes=%s,down_culculate=%s,bidCulTimes=%s",
+    sprintf(tmp_msg,"currPrice=%s,prePrice=%s,bidprice=%f,askprice=%f,up_culculate=%s,askCulTimes=%s,down_culculate=%s,bidCulTimes=%s,mkpricechangecount=%s",
             c_lastp,c_pre_p,bidPrice,askPrice,boost::lexical_cast<string>(up_culculate),boost::lexical_cast<string>(askCulTimes),
-            boost::lexical_cast<string>(down_culculate),boost::lexical_cast<string>(bidCulTimes));
+            boost::lexical_cast<string>(down_culculate),boost::lexical_cast<string>(bidCulTimes)),boost::lexical_cast<string>(mkPriceChangeCount);
     LOG(INFO)<<string(tmp_msg);
     //cout<<tmp_msg<<endl;
     //开平
@@ -446,7 +454,7 @@ void OnRtnSHFEMarketDataTwo(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
     char c_price[20]={'\0'};
     //order direction
     char char_orderdir[2] = {'\0'};
-    if(up_culculate >= askCulTimes){
+    if(mkPriceChangeCount <= priceDownToBuy){
         //up to buy
         //char_orderdir = '0';
         strcpy(char_orderdir,"0");
@@ -464,13 +472,7 @@ void OnRtnSHFEMarketDataTwo(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
 
         if(isTest == 1){
             double orderpirce = 0;
-            if((bidPrice + tick) < askPrice){
-                orderpirce = (bidPrice + tick);
-            }else if(fastCloseRisk == 1){
-                orderpirce = askPrice;//dui jia trade
-            }else{
-                orderpirce = bidPrice;
-            }
+            orderpirce = askPrice;//dui jia trade
             sprintf(c_price,"%f",orderpirce);
             pUserSpi->md_orderinsert(orderpirce,char_orderdir,char_orderoffset,instrumentID,default_volume);
 //            pUserSpi->md_orderinsert(orderpirce,char_orderdir,char_orderoffset,instrumentID,default_volume);
@@ -479,7 +481,7 @@ void OnRtnSHFEMarketDataTwo(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
             pUserSpi->md_orderinsert(max_price,char_orderdir,char_orderoffset,instrumentID,default_volume);
         }
 
-    }else if(down_culculate >= bidCulTimes){
+    }else if(mkPriceChangeCount >= priceUpToSell){
         //sell
         strcpy(char_orderdir,"1");
         //开平判断
@@ -496,13 +498,7 @@ void OnRtnSHFEMarketDataTwo(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
 
         if(isTest == 1){
             double orderpirce = 0;
-            if((askPrice - tick) > bidPrice){
-                orderpirce = askPrice - tick;
-            }else if(fastCloseRisk == 1){
-                orderpirce = bidPrice;
-            }else{
-                orderpirce = askPrice;
-            }
+            orderpirce = bidPrice;
             sprintf(c_price,"%f",orderpirce);
             pUserSpi->md_orderinsert(orderpirce,char_orderdir,char_orderoffset,instrumentID,default_volume);
 //            pUserSpi->md_orderinsert(orderpirce,char_orderdir,char_orderoffset,instrumentID,default_volume);
@@ -510,23 +506,13 @@ void OnRtnSHFEMarketDataTwo(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
             sprintf(c_price,"%f",min_price);
             pUserSpi->md_orderinsert(min_price,char_orderdir,char_orderoffset,instrumentID,default_volume);
         }
-//        char c_msg[300];
-//        c_upcul = boost::lexical_cast<string>(up_culculate);
-//        c_downcul = boost::lexical_cast<string>(down_culculate);
-//        sprintf(c_msg,"order: instrumentid=%s,direction=%s,offsetflag=%s,price=%s,askCulTimes=%d,up_culculate=%s,down_culculate=%s,bidCulTimes=%s",
-//                singleInstrument,char_orderdir,char_orderoffset,c_price,boost::lexical_cast<string>(askCulTimes),c_upcul,c_downcul,boost::lexical_cast<string>(bidCulTimes));
-//        string com_str = string(c_msg) + ";" + marketdata;
-//        //cout<<com_str<<endl;
-//        LOG(INFO)<<com_str;
-//        LogMsg *tradeMsg = new LogMsg();
-//        tradeMsg->setMsg(com_str);
-//        logqueue.push(tradeMsg);
     }
     char c_msg[300];
     c_upcul = boost::lexical_cast<string>(up_culculate);
     c_downcul = boost::lexical_cast<string>(down_culculate);
-    sprintf(c_msg,"order: instrumentid=%s,direction=%s,offsetflag=%s,price=%s,askCulTimes=%d,up_culculate=%s,down_culculate=%s,bidCulTimes=%s",
-            singleInstrument,char_orderdir,char_orderoffset,c_price,boost::lexical_cast<string>(askCulTimes),c_upcul,c_downcul,boost::lexical_cast<string>(bidCulTimes));
+    sprintf(c_msg,"order: instrumentid=%s,direction=%s,offsetflag=%s,price=%s,askCulTimes=%d,up_culculate=%s,down_culculate=%s,bidCulTimes=%s,mkpricechangecount=%s",
+            singleInstrument,char_orderdir,char_orderoffset,c_price,boost::lexical_cast<string>(askCulTimes),c_upcul,c_downcul,boost::lexical_cast<string>(bidCulTimes),
+            boost::lexical_cast<string>(mkPriceChangeCount));
     string com_str = string(c_msg) + ";" + marketdata;
     //cout<<com_str<<endl;
     LOG(INFO)<<com_str;
