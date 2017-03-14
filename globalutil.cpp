@@ -295,11 +295,13 @@ void OnRtnSHFEMarketDataTwo(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
     TXeleMdFtdcPriceType askPrice = pDepthMarketData->AskPrice;
     //4 she 5 ru
     char buf[10];
-    sprintf(buf, "%.2f", lastPrice);
-    sscanf(buf, "%lf", &lastPrice);
-    buf[10]={'\0'};
+
     sprintf(buf, "%.2f", bidPrice);
     sscanf(buf, "%lf", &bidPrice);
+    buf[10]={'\0'};
+    sprintf(buf, "%.2f", lastPrice);
+    sscanf(buf, "%lf", &lastPrice);
+
     buf[10]={'\0'};
     sprintf(buf, "%.2f", askPrice);
     sscanf(buf, "%lf", &askPrice);

@@ -1,4 +1,4 @@
-// TraderSpi.cpp: implementation of the CTraderSpi class.
+﻿// TraderSpi.cpp: implementation of the CTraderSpi class.
 //
 //////////////////////////////////////////////////////////////////////
 
@@ -1469,7 +1469,7 @@ void CTraderSpi::tradeParaProcessTwo(){
         string tmp1 ;
         //spread set
         int bidAkdSpread = abs(realShortPstLimit - realLongPstLimit);
-        if(bidAkdSpread <= lastABSSpread){
+        if(bidAkdSpread <= lastABSSpread && bidAkdSpread >= gapToAdjust){
             tmp1 = "last cut_time setting is valid,need not to adjust agin.Watch.bidAkdSpread=" + boost::lexical_cast<string>(bidAkdSpread) +
                     ",lastSpread=" + boost::lexical_cast<string>(lastABSSpread);
             lastABSSpread = bidAkdSpread;
@@ -1479,7 +1479,7 @@ void CTraderSpi::tradeParaProcessTwo(){
             return;
         }
         if(bidAkdSpread >= gapToAdjust && realShortPstLimit  > realLongPstLimit){
-            if(priceDownToBuy <= bottomOfDownToBuy){
+            if(priceDownToBuy < bottomOfDownToBuy){
                 priceDownToBuy += 1;
                 int tmppriceDownToBuy = priceDownToBuy;
                 tmp1 = "bidAkdSpread=" + boost::lexical_cast<string>(bidAkdSpread)+" >= " + boost::lexical_cast<string>(gapToAdjust) +
@@ -1487,11 +1487,11 @@ void CTraderSpi::tradeParaProcessTwo(){
                         " > realLongPstLimit=" + boost::lexical_cast<string>(realLongPstLimit) + ";priceDownToBuy set to " +
                         boost::lexical_cast<string>(tmppriceDownToBuy);
             }else{
-                tmp1 = "priceDownToBuy <= " + boost::lexical_cast<string>(bottomOfDownToBuy) +",no need to adjust.";
+                tmp1 = "priceDownToBuy = " + boost::lexical_cast<string>(bottomOfDownToBuy) +",no need to adjust.";
             }
 
         }else if(bidAkdSpread >= gapToAdjust && realShortPstLimit < realLongPstLimit){
-            if(priceUpToSell >= bottomOfUpToSell){
+            if(priceUpToSell > bottomOfUpToSell){
                 priceUpToSell -= 1;
                 int tmppriceUpToSell = priceUpToSell;
                 tmp1 = "bidAkdSpread=" + boost::lexical_cast<string>(bidAkdSpread)+" >= " + boost::lexical_cast<string>(gapToAdjust) +
@@ -1499,7 +1499,7 @@ void CTraderSpi::tradeParaProcessTwo(){
                         " < realLongPstLimit=" + boost::lexical_cast<string>(realLongPstLimit) + ",priceUpToSell set to " +
                         boost::lexical_cast<string>(tmppriceUpToSell);
             }else{
-                tmp1 = "priceUpToSell >= " + boost::lexical_cast<string>(bottomOfUpToSell) +",no need to adjust.";
+                tmp1 = "priceUpToSell = " + boost::lexical_cast<string>(bottomOfUpToSell) +",no need to adjust.";
             }
 
         }else{
