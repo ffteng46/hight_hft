@@ -54,6 +54,8 @@ extern unordered_map<string,string> seq_map_ordersysid;
 //买平标志,1开仓；2平仓
 extern boost::atomic_int longPstIsClose;
 extern boost::atomic_int shortPstIsClose;
+extern int bottomOfUpToSell;//priceUpToSell can be set to least value
+extern int bottomOfDownToBuy;//priceDownToBuy can be set to max value
 //positionmap可重入锁
 boost::recursive_mutex pst_mtx;
 //orderinsertkey与ordersysid对应关系锁
@@ -65,14 +67,23 @@ extern int shortpstlimit;
 //记录时间
 int ret = 0;
 int start_process = 0;
+int gapToAdjust = 3;
 boost::atomic_int realLongPstLimit(0);
 boost::atomic_int realShortPstLimit(0);
 boost::atomic_int fastCloseRisk(2);//1,open fast;2,close fast
 boost::atomic_int  mkPriceChangeCount(0);
-Vector<boost::atomic_int> mkPriceChangeVec;
+//Vector<boost::atomic_int> mkPriceChangeVec;
 int lastABSSpread = 0;
 int firstGap = 2;
 int secondGap = 5;
+//price up to sell
+extern int priceUpToSell_o;
+//price down to buy
+extern int priceDownToBuy_o;
+//price up to sell
+extern boost::atomic_int priceUpToSell;
+//price down to buy
+extern boost::atomic_int priceDownToBuy;
 extern TUstpFtdcBrokerIDType  BROKER_ID;				// 经纪公司代码
 extern TUstpFtdcUserIDType INVESTOR_ID;			// 投资者代码
 extern TUstpFtdcPasswordType  PASSWORD ;			// 用户密码
@@ -1458,7 +1469,7 @@ void CTraderSpi::tradeParaProcessTwo(){
         string tmp1 ;
         //spread set
         int bidAkdSpread = abs(realShortPstLimit - realLongPstLimit);
-        if(bidAkdSpread >= firstGap && bidAkdSpread < lastABSSpread){
+        if(bidAkdSpread <= lastABSSpread){
             tmp1 = "last cut_time setting is valid,need not to adjust agin.Watch.bidAkdSpread=" + boost::lexical_cast<string>(bidAkdSpread) +
                     ",lastSpread=" + boost::lexical_cast<string>(lastABSSpread);
             lastABSSpread = bidAkdSpread;
@@ -1467,70 +1478,35 @@ void CTraderSpi::tradeParaProcessTwo(){
             LOG(INFO)<<tmpmsg;
             return;
         }
-        if(bidAkdSpread >= firstGap && bidAkdSpread < secondGap && realShortPstLimit  > realLongPstLimit){
-            bidCulTimes += 2;
-            askCulTimes = 2;
-            fastCloseRisk = 1;//open fast close
-            tmp1 = "bidAkdSpread=" + boost::lexical_cast<string>(bidAkdSpread)+" >= " + boost::lexical_cast<string>(firstGap) +
-                    " < "+boost::lexical_cast<string>(secondGap)+",and realShortPstLimit=" + boost::lexical_cast<string>(realShortPstLimit) +
-                    " > realLongPstLimit=" + boost::lexical_cast<string>(realLongPstLimit) + ";bidCulTimes set to " +
-                    boost::lexical_cast<string>(bidCulTimes) + ",askCultimes set to " + boost::lexical_cast<string>(askCulTimes) +
-                    ",fastCloseRisk set to 1,open fast.";
-            if(down_culculate >= bidCulTimes){
-                down_culculate = (4*down_culculate)/5;
-                tmp1 += ";down_culculate >= bidCulTimes" + boost::lexical_cast<string>(bidCulTimes) +
-                        ",change to " + boost::lexical_cast<string>(down_culculate);
+        if(bidAkdSpread >= gapToAdjust && realShortPstLimit  > realLongPstLimit){
+            if(priceDownToBuy <= bottomOfDownToBuy){
+                priceDownToBuy += 1;
+                int tmppriceDownToBuy = priceDownToBuy;
+                tmp1 = "bidAkdSpread=" + boost::lexical_cast<string>(bidAkdSpread)+" >= " + boost::lexical_cast<string>(gapToAdjust) +
+                        ",and realShortPstLimit=" + boost::lexical_cast<string>(realShortPstLimit) +
+                        " > realLongPstLimit=" + boost::lexical_cast<string>(realLongPstLimit) + ";priceDownToBuy set to " +
+                        boost::lexical_cast<string>(tmppriceDownToBuy);
+            }else{
+                tmp1 = "priceDownToBuy <= " + boost::lexical_cast<string>(bottomOfDownToBuy) +",no need to adjust.";
             }
-            //tmpmsg.append(tmp1);
-        }else if(bidAkdSpread >= secondGap && realShortPstLimit > realLongPstLimit){
-            bidCulTimes += 4;
-            askCulTimes = 1;
-            fastCloseRisk = 1;//open fast close
-            tmp1 = "bidAkdSpread=" + boost::lexical_cast<string>(bidAkdSpread)+" >= " + boost::lexical_cast<string>(secondGap)+",and realShortPstLimit=" + boost::lexical_cast<string>(realShortPstLimit) +
-                    " > realLongPstLimit=" + boost::lexical_cast<string>(realLongPstLimit) + ",bidCulTimes set to " +
-                    boost::lexical_cast<string>(bidCulTimes) + ",askCultimes set to " + boost::lexical_cast<string>(askCulTimes) +
-                    ",fastCloseRisk set to 1,open fast.";
-            if(down_culculate >= bidCulTimes){
-                down_culculate = (4*down_culculate)/5;
-                tmp1 += ";down_culculate >= bidCulTimes" + boost::lexical_cast<string>(bidCulTimes) +
-                        ",change to " + boost::lexical_cast<string>(down_culculate);
+
+        }else if(bidAkdSpread >= gapToAdjust && realShortPstLimit < realLongPstLimit){
+            if(priceUpToSell >= bottomOfUpToSell){
+                priceUpToSell -= 1;
+                int tmppriceUpToSell = priceUpToSell;
+                tmp1 = "bidAkdSpread=" + boost::lexical_cast<string>(bidAkdSpread)+" >= " + boost::lexical_cast<string>(gapToAdjust) +
+                        ",and realShortPstLimit=" + boost::lexical_cast<string>(realShortPstLimit) +
+                        " < realLongPstLimit=" + boost::lexical_cast<string>(realLongPstLimit) + ",priceUpToSell set to " +
+                        boost::lexical_cast<string>(tmppriceUpToSell);
+            }else{
+                tmp1 = "priceUpToSell >= " + boost::lexical_cast<string>(bottomOfUpToSell) +",no need to adjust.";
             }
-            //tmpmsg.append(tmp1);
-        }else if(bidAkdSpread >= firstGap && bidAkdSpread < secondGap && realShortPstLimit < realLongPstLimit){
-            askCulTimes += 2;
-            bidCulTimes = 2;
-            fastCloseRisk = 1;//open fast close
-            tmp1 = "bidAkdSpread=" + boost::lexical_cast<string>(bidAkdSpread)+" >= " + boost::lexical_cast<string>(firstGap) +
-                    " < "+boost::lexical_cast<string>(secondGap)+",and realShortPstLimit=" + boost::lexical_cast<string>(realShortPstLimit) +
-                    " < realLongPstLimit=" + boost::lexical_cast<string>(realLongPstLimit) + ",askCulTimes set to " +
-                    boost::lexical_cast<string>(askCulTimes)+ ",bidCultimes set to " + boost::lexical_cast<string>(bidCulTimes) +
-                    ",fastCloseRisk set to 1,open fast.";
-            if(up_culculate >= askCulTimes){
-                up_culculate = (4*up_culculate)/5;
-                tmp1 += ";up_culculate >= askCulTimes" + boost::lexical_cast<string>(askCulTimes) +
-                        ",change to " + boost::lexical_cast<string>(up_culculate);
-            }
-            //tmpmsg.append(tmp1);
-        }else if(bidAkdSpread >= secondGap && realShortPstLimit < realLongPstLimit){
-            askCulTimes += 4;
-            bidCulTimes = 1;
-            fastCloseRisk = 1;//open fast close
-            tmp1 = "bidAkdSpread=" + boost::lexical_cast<string>(bidAkdSpread)+" >= " + boost::lexical_cast<string>(secondGap)+",and realShortPstLimit=" + boost::lexical_cast<string>(realShortPstLimit) +
-                    " < realLongPstLimit=" + boost::lexical_cast<string>(realLongPstLimit) + ",askCulTimes set to " +
-                    boost::lexical_cast<string>(askCulTimes) + ",bidCultimes set to " + boost::lexical_cast<string>(bidCulTimes) +
-                    ",fastCloseRisk set to 1,open fast.";
-            if(up_culculate >= askCulTimes){
-                up_culculate = (4*up_culculate)/5;
-                tmp1 += ";up_culculate >= askCulTimes" + boost::lexical_cast<string>(askCulTimes) +
-                        ",change to " + boost::lexical_cast<string>(up_culculate);
-            }
-            //tmpmsg.append(tmp1);
+
         }else{
-            tmp1 = "bidAkdSpread=" + boost::lexical_cast<string>(bidAkdSpread)+" < " + boost::lexical_cast<string>(firstGap) +
-                    ",askCulTimes bidCulTimes all set to " + boost::lexical_cast<string>(cul_times) + ",fastCloseRisk set to 2,close fast.";;
-            bidCulTimes = cul_times;
-            askCulTimes = cul_times;
-            fastCloseRisk = 2;//close fast close
+            tmp1 = "bidAkdSpread=" + boost::lexical_cast<string>(bidAkdSpread)+",priceUpToSell priceDownToBuy all set to " +
+                    boost::lexical_cast<string>(priceUpToSell_o) + "," +  boost::lexical_cast<string>(priceDownToBuy_o);
+            priceUpToSell = priceUpToSell_o;
+            priceDownToBuy = priceDownToBuy_o;
         }
         lastABSSpread = bidAkdSpread;
         tmpmsg.append(tmp1);

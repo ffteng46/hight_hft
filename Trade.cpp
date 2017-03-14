@@ -59,6 +59,14 @@ boost::atomic_int shortPstIsClose(1);
 boost::atomic_int priceUpToSell(5);
 //price down to buy
 boost::atomic_int priceDownToBuy(-5);
+//price up to sell,if price gap return to normal,then priceUPsell and buy set to *_o
+int priceUpToSell_o =0;
+int bottomOfUpToSell = 0;//priceUpToSell can be set to least value
+//price down to buy
+int priceDownToBuy_o = 0;
+int bottomOfDownToBuy = 0;//priceDownToBuy can be set to max value
+int panduan = 10;//judge if mkpricechangecount need to set to 0
+
 //价格浮动倍数
 int bidmultipy = 1;
 //价格浮动倍数卖
@@ -117,6 +125,11 @@ void TradeProcess::startTrade()
     cout<<"单一合约="<<singleInstrument<<endl;
     cout<<"priceUpToSell="<<priceUpToSell<<endl;
     cout<<"priceDownToBuy="<<priceDownToBuy<<endl;
+    cout<<"priceUpToSell_o="<<priceUpToSell_o<<endl;
+    cout<<"priceDownToBuy_o="<<priceDownToBuy_o<<endl;
+    cout<<"panduan="<<panduan<<endl;
+    cout<<"bottomOfDownToBuy="<<bottomOfDownToBuy<<endl;
+    cout<<"bottomOfUpToSell="<<bottomOfUpToSell<<endl;
     //string systime = getCurrentSystemTime();
     //cout<<systime<<endl;
     //cout<<"买卖价差比较值="<<bid_ask_spread<<endl;
@@ -195,13 +208,21 @@ void TradeProcess::datainit(){
                 }else if("pstalarm"==vec[0]){
                     pstalarm = boost::lexical_cast<int>(vec[1]);
                 }else if("priceUpToSell"==vec[0]){
-                    priceUpToSell = boost::lexical_cast<int>(vec[1]);
+                    priceUpToSell_o = boost::lexical_cast<int>(vec[1]);
+                    priceUpToSell = priceUpToSell_o;
                 }else if("priceDownToBuy"==vec[0]){
-                    priceDownToBuy = boost::lexical_cast<int>(vec[1]);
+                    priceDownToBuy_o = boost::lexical_cast<int>(vec[1]);
+                    priceDownToBuy = priceDownToBuy_o;
                 }else if("longpstlimit"==vec[0]){
                     longpstlimit = boost::lexical_cast<int>(vec[1]);
                 }else if("shortpstlimit"==vec[0]){
                     shortpstlimit = boost::lexical_cast<int>(vec[1]);
+                }else if("panduan"==vec[0]){
+                    panduan = boost::lexical_cast<int>(vec[1]);
+                }else if("bottomOfUpToSell"==vec[0]){
+                    bottomOfUpToSell = boost::lexical_cast<int>(vec[1]);
+                }else if("bottomOfDownToBuy"==vec[0]){
+                    bottomOfDownToBuy = boost::lexical_cast<int>(vec[1]);
                 }else if("instrumentList" == vec[0]){
                     /************************************************************************/
                     /* 如果读到      instrumentList，则保存到本程序中                                                               */

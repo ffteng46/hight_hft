@@ -59,7 +59,7 @@ typedef long long int64t;
 vector<string> split(string str,string pattern);
 void logEngine();				//日志记录器
 void marketdataEngine();				//行情记录器
-
+void processMkPriceNum();
 // 获取系统的当前时间，单位微秒(us)
 int64_t GetSysTimeMicros();
 char* GetDiffTime(int64_t start,int64_t end);//处理时间差
