@@ -467,6 +467,7 @@ void OnRtnSHFEMarketDataTwo(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
         //up to buy
         //char_orderdir = '0';
         strcpy(char_orderdir,"0");
+        mkPriceChangeCount = 0;
         //开平判断
         if(longPstIsClose == 1){//开仓
             orderoffset = "0";
@@ -502,6 +503,8 @@ void OnRtnSHFEMarketDataTwo(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
     }else if(mkPriceChangeCount >= priceUpToSell){
         //sell
         strcpy(char_orderdir,"1");
+        //set to init 0
+        mkPriceChangeCount = 0;
         //开平判断
         if(shortPstIsClose == 1){//开仓
             orderoffset = "0";

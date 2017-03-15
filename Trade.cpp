@@ -1,4 +1,4 @@
-// testTraderApi.cpp : 定义控制台应用程序的入口点。
+﻿// testTraderApi.cpp : 定义控制台应用程序的入口点。
 //
 #include "PublicFuncs.h"
 #include "TraderSpi.h"
@@ -81,6 +81,7 @@ int bid_ask_spread = 80;
 int trade_volume = 35;
 //持仓限额
 int limit_volume = 50;
+int gapToAdjust = 3;
 ///日志消息队列
 boost::lockfree::queue<LogMsg*> logqueue(1000);
 //存放行情消息队列
@@ -130,6 +131,7 @@ void TradeProcess::startTrade()
     cout<<"panduan="<<panduan<<endl;
     cout<<"bottomOfDownToBuy="<<bottomOfDownToBuy<<endl;
     cout<<"bottomOfUpToSell="<<bottomOfUpToSell<<endl;
+    cout<<"gapToAdjust="<<gapToAdjust<<endl;
     //string systime = getCurrentSystemTime();
     //cout<<systime<<endl;
     //cout<<"买卖价差比较值="<<bid_ask_spread<<endl;
@@ -223,6 +225,8 @@ void TradeProcess::datainit(){
                     bottomOfUpToSell = boost::lexical_cast<int>(vec[1]);
                 }else if("bottomOfDownToBuy"==vec[0]){
                     bottomOfDownToBuy = boost::lexical_cast<int>(vec[1]);
+                }else if("gapToAdjust"==vec[0]){
+                    gapToAdjust = boost::lexical_cast<int>(vec[1]);
                 }else if("instrumentList" == vec[0]){
                     /************************************************************************/
                     /* 如果读到      instrumentList，则保存到本程序中                                                               */

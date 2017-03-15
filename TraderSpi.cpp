@@ -67,7 +67,7 @@ extern int shortpstlimit;
 //记录时间
 int ret = 0;
 int start_process = 0;
-int gapToAdjust = 3;
+extern int gapToAdjust;
 boost::atomic_int realLongPstLimit(0);
 boost::atomic_int realShortPstLimit(0);
 boost::atomic_int fastCloseRisk(2);//1,open fast;2,close fast
