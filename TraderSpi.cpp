@@ -1,4 +1,4 @@
-// TraderSpi.cpp: implementation of the CTraderSpi class.
+﻿// TraderSpi.cpp: implementation of the CTraderSpi class.
 //
 //////////////////////////////////////////////////////////////////////
 
@@ -1488,8 +1488,10 @@ void CTraderSpi::tradeParaProcessTwo(){
             shortPstIsClose = 2;
             short_offset_flag = 4;
         }else if(realLongPstLimit == 0){
-            longPstIsClose = 1;
-            long_offset_flag = 0;
+            shortPstIsClose = 1;
+            short_offset_flag = 0;
+//            longPstIsClose = 1;
+//            long_offset_flag = 0;
             tmpmsg.append("long position is zero,so set long to buy open.");
             //string tmp2 = "long position is zero,so set long to buy open.";
         }
@@ -1497,8 +1499,10 @@ void CTraderSpi::tradeParaProcessTwo(){
             longPstIsClose = 2;
             long_offset_flag = 4;
         }else if(realShortPstLimit == 0){
-            shortPstIsClose = 1;
-            short_offset_flag = 0;
+            longPstIsClose = 1;
+            long_offset_flag = 0;
+//            shortPstIsClose = 1;
+//            short_offset_flag = 0;
             tmpmsg.append("short position is zero,so set short to sell open.");
         }
         cout<<tmpmsg<<endl;
