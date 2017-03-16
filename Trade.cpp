@@ -1,4 +1,4 @@
-﻿// testTraderApi.cpp : 定义控制台应用程序的入口点。
+// testTraderApi.cpp : 定义控制台应用程序的入口点。
 //
 #include "PublicFuncs.h"
 #include "TraderSpi.h"
@@ -87,8 +87,8 @@ boost::lockfree::queue<LogMsg*> logqueue(1000);
 //存放行情消息队列
 boost::lockfree::queue<LogMsg*> mkdataqueue(1000);
 ////组合开平标志: 开仓 '0';平仓 '1';平今 '3';平昨 '4';强平 '2'
-boost::atomic_int long_offset_flag(1);
-boost::atomic_int short_offset_flag(1);
+boost::atomic_int long_offset_flag(0);
+boost::atomic_int short_offset_flag(0);
 //前置id
 char char_front_id[12] = {'\0'};
 char char_session_id[20] = {'\0'};
@@ -99,7 +99,8 @@ int isTest = 1;//1=real,2=test
 int longpstlimit = 0;
 //shortpstlimit
 int shortpstlimit = 0;
-
+int isCloseTodayPosition = 1;//1,over longpstlimit will not be stop trade,but to close today position
+                             //2,over limit will stop trade
 //g_nOrdLocalID对应关系
 unordered_map<string,unordered_map<string,int64_t>> seq_map_g_nOrdLocalID;
 //ordersysid对应关系
@@ -132,6 +133,7 @@ void TradeProcess::startTrade()
     cout<<"bottomOfDownToBuy="<<bottomOfDownToBuy<<endl;
     cout<<"bottomOfUpToSell="<<bottomOfUpToSell<<endl;
     cout<<"gapToAdjust="<<gapToAdjust<<endl;
+    cout<<"isCloseTodayPosition="<<isCloseTodayPosition<<endl;
     //string systime = getCurrentSystemTime();
     //cout<<systime<<endl;
     //cout<<"买卖价差比较值="<<bid_ask_spread<<endl;
@@ -227,6 +229,8 @@ void TradeProcess::datainit(){
                     bottomOfDownToBuy = boost::lexical_cast<int>(vec[1]);
                 }else if("gapToAdjust"==vec[0]){
                     gapToAdjust = boost::lexical_cast<int>(vec[1]);
+                }else if("isCloseTodayPosition"==vec[0]){
+                    isCloseTodayPosition = boost::lexical_cast<int>(vec[1]);
                 }else if("instrumentList" == vec[0]){
                     /************************************************************************/
                     /* 如果读到      instrumentList，则保存到本程序中                                                               */

@@ -1,4 +1,4 @@
-﻿// TraderSpi.cpp: implementation of the CTraderSpi class.
+// TraderSpi.cpp: implementation of the CTraderSpi class.
 //
 //////////////////////////////////////////////////////////////////////
 
@@ -64,6 +64,7 @@ boost::recursive_mutex order_mtx;
 extern int longpstlimit;
 //shortpstlimit
 extern int shortpstlimit;
+extern int isCloseTodayPosition;
 //记录时间
 int ret = 0;
 int start_process = 0;
@@ -384,10 +385,20 @@ void CTraderSpi::OnRspQryInvestorPosition(CUstpFtdcRspInvestorPositionField *pRs
                 if(tmppst["longYdPosition"] > 0){
                     shortPstIsClose = 2;
                     short_offset_flag = 4;
+                }else{
+                    if(isCloseTodayPosition == 1 && tmppst["longTotalPosition"] > 0){//close today position
+                        shortPstIsClose = 2;
+                        short_offset_flag = 3;
+                    }
                 }
                 if(tmppst["shortYdPosition"] > 0){
                     longPstIsClose = 2;
                     long_offset_flag = 4;
+                }else{
+                    if(isCloseTodayPosition == 1 && tmppst["shortTotalPosition"] > 0){//close today position
+                        longPstIsClose = 2;
+                        long_offset_flag = 3;
+                    }
                 }
 //                int longpst = tmppst["longTotalPosition"];
 //                int shortpst = tmppst["shortTotalPosition"];
@@ -1447,25 +1458,50 @@ void CTraderSpi::tradeParaProcessTwo(){
         if(realLongPstLimit > longpstlimit){ //多头超过持仓限额
             string char_limit = boost::lexical_cast<string>(realLongPstLimit);
 //            sprintf(char_limit,"%d",realLongPstLimit);
-            longPstIsClose = 11;//long can not to open new position
-            tmpmsg.append("多头持仓量=");
-            tmpmsg.append(char_limit).append(",大于longpstlimit,long can not to open new position");
+            if(isCloseTodayPosition == 1){
+                shortPstIsClose = 2;
+                short_offset_flag = 3;
+                tmpmsg.append("多头持仓量=");
+                tmpmsg.append(char_limit).append(",大于longpstlimit,but isCloseTodayPosition set to 1, long will close today position.");
+            }else{
+                longPstIsClose = 11;//long can not to open new position
+                tmpmsg.append("多头持仓量=");
+                tmpmsg.append(char_limit).append(",大于longpstlimit,long can not to open new position.");
+            }
+
         }
         if(realShortPstLimit > shortpstlimit){//空头开平仓判断
             string char_limit =boost::lexical_cast<string>(realShortPstLimit);
 //            sprintf(char_limit,"%d",realShortPstLimit);
-            shortPstIsClose = 11;
-            tmpmsg.append("空头持仓量=");
-            tmpmsg.append(char_limit).append(",大于shortpstlimit,short can not to open new position");
+            if(isCloseTodayPosition == 1){
+                longPstIsClose = 2;
+                long_offset_flag = 3;
+                tmpmsg.append("空头持仓量=");
+                tmpmsg.append(char_limit).append(",大于shortpstlimit,but isCloseTodayPosition set to 1, short will close today position.");
+            }else{
+                shortPstIsClose = 11;//short can not to open new position
+                tmpmsg.append("空头持仓量=");
+                tmpmsg.append(char_limit).append(",大于shortpstlimit,short can not to open new position.");
+            }
         }
         if(longYdPst > 0){
             shortPstIsClose = 2;
             short_offset_flag = 4;
+        }else if(realLongPstLimit == 0){
+            longPstIsClose = 1;
+            long_offset_flag = 0;
+            tmpmsg.append("long position is zero,so set long to buy open.");
+            //string tmp2 = "long position is zero,so set long to buy open.";
         }
         if(shortYdPst > 0){
             longPstIsClose = 2;
             long_offset_flag = 4;
+        }else if(realShortPstLimit == 0){
+            shortPstIsClose = 1;
+            short_offset_flag = 0;
+            tmpmsg.append("short position is zero,so set short to sell open.");
         }
+        cout<<tmpmsg<<endl;
         string tmp1 ;
         //spread set
         int bidAkdSpread = abs(realShortPstLimit - realLongPstLimit);
