@@ -380,7 +380,10 @@ void OnRtnSHFEMarketDataTwo(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
     marketdata.append(char_turnover);
     marketdata.append(sep);
 
-
+    //marketdata.append(";processtime="+timss.str());
+    LogMsg *logmsg = new LogMsg();
+    logmsg->setMsg(marketdata);
+    mkdataqueue.push(logmsg);
 
 
     if((realLongPstLimit + realShortPstLimit) >= pstalarm){
@@ -540,19 +543,13 @@ void OnRtnSHFEMarketDataTwo(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
     processMkPriceNum();
     cout<<"mkPriceChangeCount="<<mkPriceChangeCount<<endl;
 
-//    LogMsg *tradeMsg = new LogMsg();
-//    tradeMsg->setMsg(com_str);
-//    logqueue.push(tradeMsg);
     //处理行情
     //int64_t end2 = GetSysTimeMicros();
-    auto chro_end_time = boost::chrono::high_resolution_clock::now();
-    auto pro_time = boost::chrono::duration<double>(chro_end_time - chro_start_time).count();
-    stringstream timss;
-    timss<<pro_time;
-    marketdata.append(";processtime="+timss.str());
-    LogMsg *logmsg = new LogMsg();
-    logmsg->setMsg(marketdata);
-    mkdataqueue.push(logmsg);
+    //auto chro_end_time = boost::chrono::high_resolution_clock::now();
+    //auto pro_time = boost::chrono::duration<double>(chro_end_time - chro_start_time).count();
+    //stringstream timss;
+    //timss<<pro_time;
+
 }
 void processMkPriceNum(){
     if(mkPriceRecNum%panduan == 0){
