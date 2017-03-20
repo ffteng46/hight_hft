@@ -48,6 +48,7 @@ extern int cul_times;
 extern int default_volume;
 // USER_API参数
 CXeleMdApi* mduserapi;
+boost::thread *mdthread;
 static void loadConfigFile(char *iniName) {
     if (iniName == NULL || iniName[0] == 0) {
     }
@@ -205,7 +206,7 @@ int initMarketDataApi() {
 
     //pthread_t md_thread;
     g_md_switch = 1;
-    thread_log_group.create_thread(job_recv_market_data);
+    mdthread = thread_log_group.create_thread(job_recv_market_data);
     //pthread_create(&md_thread, NULL, job_recv_market_data, mduserapi);
 //    do {
 //        cout << "Input 'q' to disconnect API:";
@@ -215,5 +216,15 @@ int initMarketDataApi() {
 //    pthread_join(md_thread, NULL);
 //    mduserapi->Release();
 //    cerr << "API release done. Exit Demo." << endl;
+}
+int releaseMarketDataApi(){
+    cout<<"release market data api"<<endl;
+    if(mduserapi){
+         mduserapi->Release();
+    }
+    if(mdthread){
+        thread_log_group.remove_thread(mdthread);
+    }
+
 }
 

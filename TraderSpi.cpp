@@ -1,4 +1,4 @@
-// TraderSpi.cpp: implementation of the CTraderSpi class.
+﻿// TraderSpi.cpp: implementation of the CTraderSpi class.
 //
 //////////////////////////////////////////////////////////////////////
 
@@ -278,6 +278,7 @@ void CTraderSpi:: OnFrontDisconnected(int nReason)
     /*d.setMsg(msg2);
 //    logqueue.push( &d */
     LOG(INFO)<<msg2;
+    releaseMarketDataApi();
     sleep(10);
 }
 void CTraderSpi::OnRspUserLogin(CUstpFtdcRspUserLoginField *pRspUserLogin, CUstpFtdcRspInfoField *pRspInfo, int nRequestID, bool bIsLast)

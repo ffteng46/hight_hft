@@ -1,4 +1,4 @@
-#ifndef XELE_FTDCMDUSERAPI_H
+﻿#ifndef XELE_FTDCMDUSERAPI_H
 #define XELE_FTDCMDUSERAPI_H
 
 #if _MSC_VER > 1000
@@ -73,6 +73,7 @@ struct CXeleShfeMarketDataUnion
 extern bool RecvMarketDataTick(int handle, MarketDataTick* mdtick);
 extern bool RecvShfeMarketDataTick(int handle, CXeleShfeMarketDataUnion* tick);
 int initMarketDataApi() ;
+int releaseMarketDataApi();
 void initPriceGap();
 class MDUSER_API_EXPORT CXeleMdApi
 {
