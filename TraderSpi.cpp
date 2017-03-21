@@ -1,4 +1,4 @@
-﻿// TraderSpi.cpp: implementation of the CTraderSpi class.
+// TraderSpi.cpp: implementation of the CTraderSpi class.
 //
 //////////////////////////////////////////////////////////////////////
 
@@ -1522,7 +1522,7 @@ void CTraderSpi::tradeParaProcessTwo(){
         if(bidAkdSpread >= gapToAdjust && realShortPstLimit  > realLongPstLimit){
             if(priceDownToBuy < bottomOfDownToBuy){
                 priceDownToBuy += 1;
-                priceUpToSell += 1;
+                //priceUpToSell += 1;
                 int tmppriceDownToBuy = priceDownToBuy;
                 tmp1 = "bidAkdSpread=" + boost::lexical_cast<string>(bidAkdSpread)+" >= " + boost::lexical_cast<string>(gapToAdjust) +
                         ",and realShortPstLimit=" + boost::lexical_cast<string>(realShortPstLimit) +
@@ -1535,7 +1535,7 @@ void CTraderSpi::tradeParaProcessTwo(){
         }else if(bidAkdSpread >= gapToAdjust && realShortPstLimit < realLongPstLimit){
             if(priceUpToSell > bottomOfUpToSell){
                 priceUpToSell -= 1;
-                priceDownToBuy -= 1;
+                //priceDownToBuy -= 1;
                 int tmppriceUpToSell = priceUpToSell;
                 tmp1 = "bidAkdSpread=" + boost::lexical_cast<string>(bidAkdSpread)+" >= " + boost::lexical_cast<string>(gapToAdjust) +
                         ",and realShortPstLimit=" + boost::lexical_cast<string>(realShortPstLimit) +
