@@ -27,6 +27,8 @@ extern  boost::atomic_int longPstIsClose;
 extern  boost::atomic_int shortPstIsClose;
 //价格变动单位
 extern double tick;
+//exception metric size
+extern int lenOfExcepSize;
 //跌停价格
 extern double min_price;
 //涨停价格
@@ -68,6 +70,10 @@ int askpst=0;
 int great_than_three_bid = 0;
 int great_than_three_ask = 0;
 int bi=30;
+//bidpricelist
+list<double> bidPriceList;
+//askpricelist
+list<double> askPriceList;
 extern  boost::atomic_int realLongPstLimit;
 extern  boost::atomic_int realShortPstLimit;
 extern  boost::atomic_int fastCloseRisk;//1,open fast;2,close fast
@@ -394,6 +400,90 @@ void OnRtnSHFEMarketDataTwo(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
         return;
     }
 
+    //开平
+    char char_orderoffset[3]={'\0'};
+    string orderoffset;
+    //exception detect
+    if(bidPriceList.size() != lenOfExcepSize){
+        bidPriceList.push_back(bidPrice);
+    }else if(bidPriceList.size() == lenOfExcepSize){
+        double p1 = bidPriceList.front();
+        //cout<<"bidprice1 is "<<p1<<endl;
+        bidPriceList.pop_front();
+        //cout<<"bidpricelist size is "<<bidPriceList.size()<<endl;
+        bidPriceList.push_back(bidPrice);
+        //cout<<"bidpricelist sibidPriceListze is "<<bidPriceList.size()<<endl;
+        if((2*lenOfExcepSize*tick) >= (bidPrice - p1) && (bidPrice - p1) > lenOfExcepSize*tick){//judge if exception
+            if(true){//short large than long,then buy close risk
+            //if(realShortPstLimit > realLongPstLimit){//short large than long,then buy close risk
+                //order direction
+                char char_orderdir[2] = {'\0'};
+                strcpy(char_orderdir,"0");//buy
+                mkPriceChangeCount = 0;
+                int orderInsertVol = realShortPstLimit - realLongPstLimit;
+                //开平判断
+                if(longPstIsClose == 1){//开仓
+                    orderoffset = "0";
+                }else if(longPstIsClose == 2){//平仓  开仓 '0';平仓 '1';平今 '3';平昨 '4';强平 '2'
+                    orderoffset = getCloseMethod("buy");
+                }
+                strcpy(char_orderoffset,orderoffset.c_str());
+                double orderpirce = 0;
+                orderpirce = askPrice;//dui jia trade
+                //sprintf(c_price,"%f",orderpirce);
+                pUserSpi->md_orderinsert(orderpirce,char_orderdir,char_orderoffset,instrumentID,default_volume+1);//now default_vulume
+                char c_msg[300];
+                sprintf(c_msg,"order: instrumentid=%s,direction=%s,offsetflag=%s,price=%f,price up exception,from %f -> %f,close short risk.",
+                        singleInstrument,char_orderdir,char_orderoffset,orderpirce,p1,bidPrice);
+                string com_str = string(c_msg);
+                cout<<com_str<<endl;
+                LOG(INFO)<<com_str;
+                return;
+            }
+        }
+    }else{
+        cout<<"bidPriceList size error:size = "<<bidPriceList.size()<<endl;
+    }
+    if(askPriceList.size() != lenOfExcepSize){
+        askPriceList.push_back(askPrice);
+    }else if(askPriceList.size() == lenOfExcepSize){
+        double p1 = askPriceList.front();
+        //cout<<"askprice1 is "<<p1<<endl;
+        askPriceList.pop_front();
+        //cout<<"askpricelist size is "<<askPriceList.size()<<endl;
+        askPriceList.push_back(askPrice);
+//        cout<<"bidpricelist size is "<<bidPriceList.size()<<endl;
+        if((2*lenOfExcepSize*tick) >= (p1 - askPrice) && (p1 - askPrice) > lenOfExcepSize*tick){//judge if exception
+            if(true){//long large than short,then sell close risk
+            //if(realShortPstLimit < realLongPstLimit){//long large than short,then sell close risk
+                //order direction
+                char char_orderdir[2] = {'\0'};
+                strcpy(char_orderdir,"1");//sell
+                mkPriceChangeCount = 0;
+                int orderInsertVol = realLongPstLimit - realShortPstLimit;
+                //开平判断
+                if(shortPstIsClose == 1){//开仓
+                    orderoffset = "0";
+                }else if(shortPstIsClose == 2){//平仓  开仓 '0';平仓 '1';平今 '3';平昨 '4';强平 '2'
+                    orderoffset = getCloseMethod("sell");
+                }
+                strcpy(char_orderoffset,orderoffset.c_str());
+                double orderpirce = 0;
+                orderpirce = bidPrice;//duijia
+                //sprintf(c_price,"%f",orderpirce);
+                pUserSpi->md_orderinsert(orderpirce,char_orderdir,char_orderoffset,instrumentID,default_volume+1);//now default_volume
+                char c_msg[300];
+                sprintf(c_msg,"order: instrumentid=%s,direction=%s,offsetflag=%s,price=%s,price down exception,from %f -> %f,close long risk.",
+                        singleInstrument,char_orderdir,char_orderoffset,orderpirce,p1,askPrice);
+                string com_str = string(c_msg);
+                cout<<com_str<<endl;
+                LOG(INFO)<<com_str;
+                return;
+            }
+        }
+    }else{
+        cout<<"askPriceList size error:size = "<<askPriceList.size()<<endl;
+    }
     vector<double> gap_list;
     //cant find
     if(map_price_gap.find(lastPrice) == map_price_gap.end()){
@@ -456,9 +546,7 @@ void OnRtnSHFEMarketDataTwo(CXeleShfeHighLevelOneMarketData *pDepthMarketData)
             c_lastp,c_pre_p,bidPrice,askPrice,tmppriceDownToBuy,tmppriceUpToSell,mkrn);
     LOG(INFO)<<string(tmp_msg);
     //cout<<tmp_msg<<endl;
-    //开平
-    char char_orderoffset[3]={'\0'};
-    string orderoffset;
+
     last_gap = gap;
     //
     string c_upcul;

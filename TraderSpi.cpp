@@ -1,4 +1,4 @@
-﻿// TraderSpi.cpp: implementation of the CTraderSpi class.
+// TraderSpi.cpp: implementation of the CTraderSpi class.
 //
 //////////////////////////////////////////////////////////////////////
 
@@ -568,6 +568,19 @@ void CTraderSpi::Show(CUstpFtdcOrderField *pOrder)
 
 void CTraderSpi::OnRtnOrder(CUstpFtdcOrderField *pOrder)
 {
+    ///撤单
+    ///define USTP_FTDC_OS_Canceled '5'
+    ///
+    string str_direction = boost::lexical_cast<string>(pOrder->Direction);
+    string str_status = boost::lexical_cast<string>(pOrder->OrderStatus);
+    if(str_status == "5"){
+        if(str_direction == "0"){//buy
+            mkPriceChangeCount += 3;
+        }else if(str_direction == "1"){//sell
+            mkPriceChangeCount -= 3;
+        }
+
+    }
     string systime = getCurrentSystemTime();
     string msg = "OnRtnOrder:" + systime + ";";
     msg.append(getRtnOrder(pOrder));

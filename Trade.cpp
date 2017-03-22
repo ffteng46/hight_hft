@@ -48,6 +48,8 @@ double min_price = 0;
 double max_price = 0;
 //价格变动单位
 double tick = 0;
+//exception metric size
+int lenOfExcepSize = 4;
 //卖出报单触发信号
 boost::atomic_int askCulTimes(3);
 //买入报单触发信号
